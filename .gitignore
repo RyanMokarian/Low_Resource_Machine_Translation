@@ -1,5 +1,7 @@
 # User defined things to ignore
 logs.txt
+saved_model/
+visualizations/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

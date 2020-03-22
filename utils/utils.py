@@ -5,6 +5,19 @@ import numpy as np
 import tensorflow as tf
 
 UNKNOWN_TOKEN = '<unknown>'
+SAVED_MODEL_DIR = 'saved_model'
+
+def create_folder(path: str):
+    """ This function creates a folder if it does not already exists."""
+    if not os.path.exists(path):
+        os.mkdir(path)
+
+def save_model(model: tf.keras.Model):
+    """ This function saves the model to disk."""
+    create_folder(SAVED_MODEL_DIR)
+    model_path = os.path.join(SAVED_MODEL_DIR, model.__class__.__name__)
+    create_folder(model_path)
+    model.save_weights(os.path.join(model_path, "model"))
 
 def create_vocab(file_path: str, vocab_size: int) -> typing.Dict[str, np.ndarray]:
     """Returns a dictionary that maps words to one hot embeddings"""
@@ -23,10 +36,11 @@ def create_vocab(file_path: str, vocab_size: int) -> typing.Dict[str, np.ndarray
     assert len(sorted_unique_words) >= vocab_size, "vocab_length is too big."
     
     # Build vocabulary
-    vocab = {}
-    for i in range(vocab_size):
-        vocab[sorted_unique_words[i]] = np.eye(vocab_size+1)[i]
-    vocab[UNKNOWN_TOKEN] = np.eye(vocab_size+1)[vocab_size]
+    vocab = {word:i for i, word in enumerate(sorted_unique_words[:vocab_size-1])}
+    # vocab = {}
+    # for i in range(vocab_size-1):
+    #     vocab[sorted_unique_words[i]] = i#np.eye(vocab_size+1)[i]
+    vocab[UNKNOWN_TOKEN] = vocab_size-1 #np.eye(vocab_size+1)[vocab_size]
         
     return vocab
     
@@ -39,7 +53,7 @@ def get_sentences(file_path: str) -> typing.List[typing.List[str]]:
     # Split on words
     sentences = []
     for line in lines:
-        sentences.append(line.split())
+        sentences.append(line.strip().split())
         
     return sentences
 
@@ -54,7 +68,7 @@ def load_training_data(dir_path: str,
     
     def sentence_to_vocab(sentences, vocab):
         # Build training data
-        data = np.zeros((len(sentences), max_seq_len, len(vocab)))
+        data = np.zeros((len(sentences), max_seq_len))
         for i in range(len(sentences)):
             for j in range(len(sentences[i])):
                 if j >= max_seq_len:
