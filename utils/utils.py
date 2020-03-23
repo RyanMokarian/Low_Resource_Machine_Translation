@@ -33,15 +33,14 @@ def create_vocab(file_path: str, vocab_size: int) -> typing.Dict[str, np.ndarray
     unique_words, word_counts = np.unique(words, return_counts=True)
     sorted_unique_words = unique_words[np.argsort(word_counts)[::-1]]
     
-    assert len(sorted_unique_words) >= vocab_size, "vocab_length is too big."
+    if vocab_size is None:
+        vocab_size = len(sorted_unique_words)+1 # +1 for the unknown token
+    assert vocab_size <= len(sorted_unique_words)+1, "vocab_size is too big."
     
     # Build vocabulary
-    vocab = {word:i for i, word in enumerate(sorted_unique_words[:vocab_size-1])}
-    # vocab = {}
-    # for i in range(vocab_size-1):
-    #     vocab[sorted_unique_words[i]] = i#np.eye(vocab_size+1)[i]
-    vocab[UNKNOWN_TOKEN] = vocab_size-1 #np.eye(vocab_size+1)[vocab_size]
-        
+    vocab = {word:i+1 for i, word in enumerate(sorted_unique_words[:vocab_size-1])}
+    vocab[UNKNOWN_TOKEN] = vocab_size
+    
     return vocab
     
 def get_sentences(file_path: str) -> typing.List[typing.List[str]]:
@@ -57,12 +56,13 @@ def get_sentences(file_path: str) -> typing.List[typing.List[str]]:
         
     return sentences
 
-
-def load_training_data(dir_path: str, 
+def load_training_data(en_path: str,
+                       fr_path: str, 
                        vocab_en: typing.Dict[str, np.ndarray], 
-                       vocab_fr: typing.Dict[str, np.ndarray], 
+                       vocab_fr: typing.Dict[str, np.ndarray],
+                       max_seq_len: int,
+                       batch_size: int,
                        valid_ratio: float = 0.15,
-                       max_seq_len: int = 20
                       ) -> typing.Tuple[tf.data.Dataset, tf.data.Dataset]:
     """Returns train and valid datasets"""
     
@@ -80,8 +80,8 @@ def load_training_data(dir_path: str,
         return data
     
     # Get sentences
-    sentences_en = get_sentences(os.path.join(dir_path, 'train.lang1'))
-    sentences_fr = get_sentences(os.path.join(dir_path, 'train.lang2'))
+    sentences_en = get_sentences(en_path)
+    sentences_fr = get_sentences(fr_path)
     
     # Build training data
     train_X = sentence_to_vocab(sentences_en, vocab_en)
@@ -92,7 +92,9 @@ def load_training_data(dir_path: str,
     train_X, valid_X = train_X[:cuttoff_idx], train_X[cuttoff_idx:]
     train_y, valid_y = train_y[:cuttoff_idx], train_y[cuttoff_idx:]
     
-    train_dataset = tf.data.Dataset.from_tensor_slices((train_X, train_y))
-    valid_dataset = tf.data.Dataset.from_tensor_slices((valid_X, valid_y))
-    
+    train_dataset = tf.data.Dataset.from_tensor_slices((train_X, train_y)) \
+                                   .padded_batch(batch_size, drop_remainder=True, padded_shapes=([None], [None]))
+    valid_dataset = tf.data.Dataset.from_tensor_slices((valid_X, valid_y)) \
+                                   .padded_batch(batch_size, drop_remainder=True, padded_shapes=([None], [None]))
+
     return train_dataset, valid_dataset

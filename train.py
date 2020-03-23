@@ -18,16 +18,23 @@ logger = logging.getLogger()
 # Metrics
 train_accuracy_metric = tf.keras.metrics.SparseCategoricalAccuracy()
 valid_accuracy_metric = tf.keras.metrics.SparseCategoricalAccuracy()
+cross_entropy = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
-def train_epoch(model, data_loader, batch_size, loss_function, optimizer):
+def loss_function(y_true, y_pred):
+    mask = tf.math.logical_not(tf.math.equal(y_true, 0))
+    loss_ = cross_entropy(y_true, y_pred)
+
+    mask = tf.cast(mask, dtype=loss_.dtype)
+    loss_ *= mask
+
+    return tf.reduce_mean(loss_)
+
+def train_epoch(model, data_loader, batch_size, optimizer):
     train_accuracy_metric.reset_states()
-    for batch in tqdm(data_loader.batch(batch_size, drop_remainder=True), desc='train epoch', leave=False):
+    for batch in tqdm(data_loader, desc='train epoch', leave=False):
         inputs, labels = batch
-        # print('inputs shape : ', inputs.shape)
-        # print('labels shape : ', labels.shape)
         with tf.GradientTape() as tape:
             preds = model(inputs)
-            # print('preds shape : ', preds.shape)
             loss = loss_function(y_true=labels, y_pred=preds)
             
         grads = tape.gradient(loss, model.trainable_variables)
@@ -35,9 +42,9 @@ def train_epoch(model, data_loader, batch_size, loss_function, optimizer):
 
         train_accuracy_metric.update_state(y_true=labels, y_pred=preds)
 
-def test_epoch(model, data_loader, batch_size, loss_function):
+def test_epoch(model, data_loader, batch_size):
     valid_accuracy_metric.reset_states()
-    for batch in tqdm(data_loader.batch(batch_size, drop_remainder=True), desc='train epoch', leave=False):
+    for batch in tqdm(data_loader, desc='train epoch', leave=False):
         inputs, labels = batch
         preds = model(inputs)
         loss = loss_function(y_true=labels, y_pred=preds)
@@ -50,26 +57,19 @@ def main(data_dir: str = '/project/cq-training-1/project2/data/',
          optimizer: str = 'adam',
          lr: float = 1e-4, 
          batch_size: int = 100,
-         vocab_size: str = 1000,
+         vocab_size: int = None, # If None all tokens of will be in vocab
+         seq_len: int = 20,
          seed: bool = True
         ):
-    # Call to remove warning about casting float64 to float32
+    # Call to remove tensorflow warning about casting float64 to float32
     tf.keras.backend.set_floatx('float64')
 
     # Set random seed
     if seed:
         tf.random.set_seed(SEED)
         np.random.seed(SEED)
-    
-    # Create model
-    if model == 'gru':
-        model = baselines.GRU(vocab_size, batch_size)
-    else:
-        raise Exception(f'Model "{model}" not recognized.')
         
-    # Loss and optimizer
-    loss = tf.keras.losses.SparseCategoricalCrossentropy()#from_logits=True)
-    #sparse_softmax_cross_entropy_with_logits
+    # Optimizer
     if optimizer == 'adam':
         optimizer = tf.keras.optimizers.Adam(lr)
     elif optimizer == 'sgd':
@@ -79,12 +79,20 @@ def main(data_dir: str = '/project/cq-training-1/project2/data/',
         
     # Create vocabs
     logger.info('Creating vocab...')
-    vocab_en = utils.create_vocab(os.path.join(data_dir, 'train.lang1'), vocab_size)
-    vocab_fr = utils.create_vocab(os.path.join(data_dir, 'train.lang2'), vocab_size)
+    path_en = os.path.join(data_dir, 'train.lang1')
+    path_fr = os.path.join(data_dir, 'train.lang2')
+    vocab_en = utils.create_vocab(path_en, vocab_size)
+    vocab_fr = utils.create_vocab(path_fr, vocab_size)
     
-    logger.info('Loading datasets...')
     # Load datasets
-    train_dataset, valid_dataset = utils.load_training_data(data_dir, vocab_en, vocab_fr)
+    logger.info('Loading datasets...')
+    train_dataset, valid_dataset = utils.load_training_data(path_en, path_fr, vocab_en, vocab_fr, seq_len, batch_size)
+
+    # Create model
+    if model == 'gru':
+        model = baselines.GRU(len(vocab_fr), batch_size)
+    else:
+        raise Exception(f'Model "{model}" not recognized.')
     
     # Training loop
     logger.info('Training...')
@@ -92,8 +100,8 @@ def main(data_dir: str = '/project/cq-training-1/project2/data/',
     metrics = {'train_accuracy' : [], 'valid_accuracy' : []}
     best_valid_accuracy = 0
     for epoch in range(epochs):
-        train_epoch(model, train_dataset, batch_size, loss, optimizer)
-        test_epoch(model, valid_dataset, batch_size, loss)
+        train_epoch(model, train_dataset, batch_size, optimizer)
+        test_epoch(model, valid_dataset, batch_size)
         train_accuracy = np.sqrt(train_accuracy_metric.result().numpy())
         valid_accuracy = np.sqrt(valid_accuracy_metric.result().numpy())
 
