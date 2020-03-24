@@ -4,6 +4,7 @@ import typing
 import numpy as np
 import tensorflow as tf
 
+PADDING_TOKEN = '<padding>'
 UNKNOWN_TOKEN = '<unknown>'
 SAVED_MODEL_DIR = 'saved_model'
 
@@ -38,10 +39,14 @@ def create_vocab(file_path: str, vocab_size: int) -> typing.Dict[str, np.ndarray
     assert vocab_size <= len(sorted_unique_words)+1, "vocab_size is too big."
     
     # Build vocabulary
-    vocab = {word:i+1 for i, word in enumerate(sorted_unique_words[:vocab_size-1])}
-    vocab[UNKNOWN_TOKEN] = vocab_size
-    
-    return vocab
+    word2idx = {word:i+1 for i, word in enumerate(sorted_unique_words[:vocab_size-1])}
+    word2idx[UNKNOWN_TOKEN] = vocab_size
+    word2idx[PADDING_TOKEN] = 0
+    idx2word = {i+1:word for i, word in enumerate(sorted_unique_words[:vocab_size-1])}
+    idx2word[vocab_size] = UNKNOWN_TOKEN
+    idx2word[0] = PADDING_TOKEN
+
+    return word2idx, idx2word
     
 def get_sentences(file_path: str) -> typing.List[typing.List[str]]:
     """Reads file and returns the sentences."""
@@ -98,3 +103,13 @@ def load_training_data(en_path: str,
                                    .padded_batch(batch_size, drop_remainder=True, padded_shapes=([None], [None]))
 
     return train_dataset, valid_dataset
+
+def generate_sentence(indices, vocab: typing.Dict[str, np.ndarray]):
+    sentence = ''
+    for idx in indices:
+        if int(idx) not in vocab:
+            print(f'idx {idx} not in vocab')
+            continue
+        sentence += vocab[int(idx)]
+        sentence += ' '
+    return sentence
