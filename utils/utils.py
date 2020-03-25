@@ -4,7 +4,7 @@ import typing
 import numpy as np
 import tensorflow as tf
 
-from xtra_process import ExtraProcessing
+from process_text import process
 
 PADDING_TOKEN = '<pad>'
 UNKNOWN_TOKEN = '<unk>'
@@ -55,12 +55,10 @@ def get_sentences(file_path: str) -> typing.List[typing.List[str]]:
     # Read file lines
     with open(file_path, 'r') as f:
         lines = f.readlines()
-
-    xtra_p = ExtraProcessing()
     # Split on words
     sentences = []
     for line in lines:
-        line = xtra_p.process(line)
+        line = process(line)
         sentences.append(line.split())
         
     return sentences
