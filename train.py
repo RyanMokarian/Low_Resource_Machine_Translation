@@ -7,6 +7,7 @@ import tensorflow as tf
 from tqdm import tqdm
 
 from models import baselines
+from models.seq2seq_gru import Seq2SeqGRU
 from utils import utils
 from utils import logging
 from utils import plots
@@ -32,26 +33,27 @@ def loss_function(y_true, y_pred):
 def train_epoch(model, data_loader, batch_size, optimizer):
     train_accuracy_metric.reset_states()
     for batch in tqdm(data_loader, desc='train epoch', leave=False):
-        inputs, labels = batch
+        batch['gen_seq_len'] = batch['labels'].shape[1]
+        inputs = batch['inputs']
         with tf.GradientTape() as tape:
-            preds = model(inputs)
-            loss = loss_function(y_true=labels, y_pred=preds)
+            preds = model(batch, training=True)
+            loss = loss_function(y_true=batch['labels'], y_pred=preds)
             
         grads = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-        train_accuracy_metric.update_state(y_true=labels, y_pred=preds)
+        train_accuracy_metric.update_state(y_true=batch['labels'], y_pred=preds)
 
 def test_epoch(model, data_loader, batch_size, idx2word_fr):
     valid_accuracy_metric.reset_states()
     for batch in tqdm(data_loader, desc='train epoch', leave=False):
-        inputs, labels = batch
-        preds = model(inputs)
-        loss = loss_function(y_true=labels, y_pred=preds)
+        batch['gen_seq_len'] = batch['labels'].shape[1]
+        preds = model(batch)
+        loss = loss_function(y_true=batch['labels'], y_pred=preds)
 
-        valid_accuracy_metric.update_state(y_true=labels, y_pred=preds)
+        valid_accuracy_metric.update_state(y_true=batch['labels'], y_pred=preds)
 
-    label_sentence = utils.generate_sentence(labels[0].numpy().astype('int'), idx2word_fr)
+    label_sentence = utils.generate_sentence(batch['labels'][0].numpy().astype('int'), idx2word_fr)
     pred_sentence = utils.generate_sentence(np.argmax(preds[0].numpy().astype('int'), axis=1), idx2word_fr)
     logger.debug(f'Sample : \n  Label : {label_sentence}\n  Pred : {pred_sentence}')
 
@@ -66,7 +68,7 @@ def main(data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
          seed: bool = True
         ):
     # Call to remove tensorflow warning about casting float64 to float32
-    tf.keras.backend.set_floatx('float64')
+    tf.keras.backend.set_floatx('float32')
 
     # Set random seed
     if seed:
@@ -95,6 +97,8 @@ def main(data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
     # Create model
     if model == 'gru':
         model = baselines.GRU(len(word2idx_fr), batch_size)
+    elif model == 'seq2seqgru':
+        model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, embedding_dim=256, encoder_units=256, decoder_units=256, attention_units=256)
     else:
         raise Exception(f'Model "{model}" not recognized.')
     

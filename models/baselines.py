@@ -14,6 +14,6 @@ class GRU(tf.keras.Model):
             tf.keras.layers.Dense(vocab_size, activation=tf.nn.log_softmax)
         ])
 
-    def call(self, inputs):
-        return self.model(inputs)
+    def call(self, batch, training=False):
+        return self.model(batch['inputs'])
 
