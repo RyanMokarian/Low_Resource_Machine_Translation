@@ -65,25 +65,25 @@ def load_training_data(en_path: str,
                        fr_path: str, 
                        vocab_en: typing.Dict[str, np.ndarray], 
                        vocab_fr: typing.Dict[str, np.ndarray],
-                       max_seq_len: int,
+                       seq_len: int,
                        batch_size: int,
                        valid_ratio: float = 0.15,
                       ) -> typing.Tuple[tf.data.Dataset, tf.data.Dataset]:
     """Returns train and valid datasets"""
     
     def sentence_to_vocab(sentences, vocab):
-        # Build training data
-        data = np.zeros((len(sentences), max_seq_len))
+        data = []
         for i in range(len(sentences)):
+            sentence = []
             for j in range(len(sentences[i])):
-                if j >= max_seq_len:
-                    break
+                if seq_len is not None and j >= seq_len:
+                    break 
                 if sentences[i][j] in vocab:
-                    data[i, j] = vocab[sentences[i][j]]
+                    sentence.append(vocab[sentences[i][j]])
                 else:
-                    data[i, j] = vocab[UNKNOWN_TOKEN]
-        return data
-    
+                    sentence.append(vocab[UNKNOWN_TOKEN])
+            data.append(np.array(sentence))
+        return np.array(data)
     # Get sentences
     sentences_en = get_sentences(en_path)
     sentences_fr = get_sentences(fr_path)
@@ -97,14 +97,17 @@ def load_training_data(en_path: str,
     train_X, valid_X = train_X[:cuttoff_idx], train_X[cuttoff_idx:]
     train_y, valid_y = train_y[:cuttoff_idx], train_y[cuttoff_idx:]
     
-    train_dataset = tf.data.Dataset.from_tensor_slices((train_X, train_y)) \
-                                   .padded_batch(batch_size, drop_remainder=True, padded_shapes=([None], [None]))
-    valid_dataset = tf.data.Dataset.from_tensor_slices((valid_X, valid_y)) \
-                                   .padded_batch(batch_size, drop_remainder=True, padded_shapes=([None], [None]))
+    train_dataset = tf.data.Dataset.from_generator(lambda: zip(train_X, train_y), (tf.int64, tf.int64), 
+                                                   output_shapes=(tf.TensorShape([None]), tf.TensorShape([None]))) \
+                                   .padded_batch(batch_size, drop_remainder=True, padded_shapes=([seq_len], [seq_len]))
+    valid_dataset = tf.data.Dataset.from_generator(lambda: zip(valid_X, valid_y), (tf.int64, tf.int64), 
+                                                   output_shapes=(tf.TensorShape([None]), tf.TensorShape([None]))) \
+                                   .padded_batch(batch_size, drop_remainder=True, padded_shapes=([seq_len], [seq_len]))
 
     return train_dataset, valid_dataset
 
-def generate_sentence(indices, vocab: typing.Dict[str, np.ndarray]):
+def generate_sentence(indices: typing.List[int], vocab: typing.Dict[str, np.ndarray]):
+    """Generate a sentence from a list of indices."""
     sentence = ''
     for idx in indices:
         if int(idx) not in vocab:

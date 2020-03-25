@@ -62,7 +62,7 @@ def main(data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
          lr: float = 1e-4, 
          batch_size: int = 100,
          vocab_size: int = None, # If None all tokens of will be in vocab
-         seq_len: int = 20, # If None the seq len is dynamic
+         seq_len: int = 20, # If None the seq len is dynamic (might not work with all models)
          seed: bool = True
         ):
     # Call to remove tensorflow warning about casting float64 to float32
