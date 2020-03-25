@@ -1,5 +1,7 @@
-import numpy as np
 import re
+
+import numpy as np
+
 
 
 class ExtraProcessing():
@@ -9,11 +11,9 @@ class ExtraProcessing():
         
     def regx(self,x):
         # Remove space, comma or point  between numbers
-        x = re.sub(r"(\d+)[\s+|,|.](\d+)",r"\1\2",x)
-        # enumerate for number tokens
-        numerate = lambda m, i=iter(range(10)):f"{self.TK_NUM}_{str(next(i))}"
+        x = re.sub(r"(\d+)[\s+|,|.](\d+)",r"\1\2",x)            
         # Replace numbers with TK_NUM
-        x = re.sub("\d+",numerate,x)
+        x = re.sub("\d+",self.TK_NUM,x) 
         # Remove some punctuation
         PUNCT = '#&\()*+/<=>@[\\]^_{|}~'
         table = str.maketrans("","",PUNCT)
