@@ -4,8 +4,10 @@ import typing
 import numpy as np
 import tensorflow as tf
 
-PADDING_TOKEN = '<padding>'
-UNKNOWN_TOKEN = '<unknown>'
+from process_text import process
+
+PADDING_TOKEN = '<pad>'
+UNKNOWN_TOKEN = '<unk>'
 SAVED_MODEL_DIR = 'saved_model'
 
 def create_folder(path: str):
@@ -53,11 +55,11 @@ def get_sentences(file_path: str) -> typing.List[typing.List[str]]:
     # Read file lines
     with open(file_path, 'r') as f:
         lines = f.readlines()
-    
     # Split on words
     sentences = []
     for line in lines:
-        sentences.append(line.strip().split())
+        line = process(line)
+        sentences.append(line.split())
         
     return sentences
 
