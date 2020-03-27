@@ -61,10 +61,10 @@ def test_epoch(model, data_loader, batch_size, idx2word_fr, idx2word_en):
         valid_accuracy_metric.update_state(y_true=batch['labels'], y_pred=preds)
         valid_bleu_metric.update_state(y_true=batch['labels'], y_pred=preds, vocab=idx2word_fr)
 
-        label_sentence = utils.generate_sentence(batch['labels'][0].numpy().astype('int'), idx2word_fr)
-        pred_sentence = utils.generate_sentence(np.argmax(preds[0].numpy(), axis=1).astype('int'), idx2word_fr)
-        source_sentence = utils.generate_sentence(batch['inputs'][0].numpy().astype('int'), idx2word_en)
-        logger.debug(f'Sample : \n    Source : {source_sentence}\n    Pred : {pred_sentence}\n    Label : {label_sentence}')
+    label_sentence = utils.generate_sentence(batch['labels'][0].numpy().astype('int'), idx2word_fr)
+    pred_sentence = utils.generate_sentence(np.argmax(preds[0].numpy(), axis=1).astype('int'), idx2word_fr)
+    source_sentence = utils.generate_sentence(batch['inputs'][0].numpy().astype('int'), idx2word_en)
+    logger.debug(f'Sample : \n    Source : {source_sentence}\n    Pred : {pred_sentence}\n    Label : {label_sentence}')
 
 def main(data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
          model: str = 'seq2seqgru',
