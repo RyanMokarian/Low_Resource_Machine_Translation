@@ -17,3 +17,15 @@ class GRU(tf.keras.Model):
     def call(self, batch, training=False):
         return self.model(batch['inputs'])
 
+class LSTM(tf.keras.Model):
+    def __init__(self, vocab_size, hidden_size=100, embedding_dim=256):
+        super(LSTM, self).__init__()
+        self.embed = tf.keras.layers.Embedding(vocab_size, embedding_dim)
+        self.dense1 = tf.keras.layers.LSTM(units=hidden_size)
+        self.pred = tf.keras.layers.Dense(2)
+
+    def __call__(self, inputs):
+        emb = self.embed(inputs)
+        d1 = self.dense1(emb)
+        outputs = self.pred(d1)
+        return outputs

@@ -1,4 +1,5 @@
 # User defined things to ignore
+.idea
 logs.txt
 saved_model/
 visualizations/
