@@ -41,7 +41,7 @@ def replace_all_caps(x):
             res.append(t)
     return res
 
-def deal_caps(x):
+def replace_caps(x):
     """Replace all Capitalized tokens in `x` by their lower version and add `TK_MAJ` before."""
     res = []
     for t in x:
@@ -54,7 +54,27 @@ def deal_caps(x):
 def process(x):
     x = regx(x.strip())
     x = x.split()
-    post = [deal_caps, replace_all_caps, start_end]
+    post = [replace_caps, replace_all_caps, start_end]
     for p in post:
         x = p(x)
     return ' '.join(x)
+
+def recapitalize(x: str):
+    """Remove <maj> tokens and <up> tokens and capitalize the letters."""
+    allcap = False
+    cap = False
+    res = []
+    for t in x.split():
+        if allcap:
+            res.append(t.upper())
+            allcap = False
+        elif cap:
+            res.append(t[0].upper() + t[1:])
+            cap = False
+        elif t == TK_UP:
+            allcap = True
+        elif t == TK_MAJ:
+            cap = True
+        else:
+            res.append(t)
+    return ' '.join(res)

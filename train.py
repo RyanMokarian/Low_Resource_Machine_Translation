@@ -26,7 +26,8 @@ cross_entropy = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
 def loss_function(y_true, y_pred):
     mask = tf.math.logical_not(tf.math.equal(y_true, 0))
-    loss_ = cross_entropy(y_true, y_pred)
+    y_true, y_pred = y_true[:,1:], y_pred[:,1:] # Ignore BOS token
+    loss_ = cross_entropy(y_true, y_pred) 
 
     mask = tf.cast(mask, dtype=loss_.dtype)
     loss_ *= mask
@@ -45,8 +46,11 @@ def train_epoch(model, data_loader, batch_size, optimizer, idx2word_fr):
             
         grads = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
+        
+        train_accuracy_metric.update_state(y_true=batch['labels'], y_pred=preds)
+        train_bleu_metric.update_state(y_true=batch['labels'], y_pred=preds, vocab=idx2word_fr)
 
-def test_epoch(model, data_loader, batch_size, idx2word_fr):
+def test_epoch(model, data_loader, batch_size, idx2word_fr, idx2word_en):
     valid_accuracy_metric.reset_states()
     valid_bleu_metric.reset_states()
     for batch in tqdm(data_loader, desc='valid epoch', leave=False):
@@ -57,18 +61,19 @@ def test_epoch(model, data_loader, batch_size, idx2word_fr):
         valid_accuracy_metric.update_state(y_true=batch['labels'], y_pred=preds)
         valid_bleu_metric.update_state(y_true=batch['labels'], y_pred=preds, vocab=idx2word_fr)
 
-    label_sentence = utils.generate_sentence(batch['labels'][0].numpy().astype('int'), idx2word_fr)
-    pred_sentence = utils.generate_sentence(np.argmax(preds[0].numpy(), axis=1).astype('int'), idx2word_fr)
-    logger.debug(f'Sample : \n  Label : {label_sentence}\n  Pred : {pred_sentence}')
+        label_sentence = utils.generate_sentence(batch['labels'][0].numpy().astype('int'), idx2word_fr)
+        pred_sentence = utils.generate_sentence(np.argmax(preds[0].numpy(), axis=1).astype('int'), idx2word_fr)
+        source_sentence = utils.generate_sentence(batch['inputs'][0].numpy().astype('int'), idx2word_en)
+        logger.debug(f'Sample : \n    Source : {source_sentence}\n    Pred : {pred_sentence}\n    Label : {label_sentence}')
 
 def main(data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
-         model: str = 'gru',
+         model: str = 'seq2seqgru',
          epochs: int = 10,
          optimizer: str = 'adam',
          lr: float = 1e-4, 
          batch_size: int = 100,
          vocab_size: int = None, # If None all tokens of will be in vocab
-         seq_len: int = 20, # If None the seq len is dynamic (might not work with all models)
+         seq_len: int = None, # If None the seq len is dynamic (might not work with all models)
          seed: bool = True
         ):
     # Call to remove tensorflow warning about casting float64 to float32
@@ -113,7 +118,7 @@ def main(data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
     best_valid_bleu = 0
     for epoch in range(epochs):
         train_epoch(model, train_dataset, batch_size, optimizer, idx2word_fr)
-        test_epoch(model, valid_dataset, batch_size, idx2word_fr)
+        test_epoch(model, valid_dataset, batch_size, idx2word_fr, idx2word_en)
         train_accuracy = train_accuracy_metric.result().numpy()
         valid_accuracy = valid_accuracy_metric.result().numpy()
         train_bleu = train_bleu_metric.result()

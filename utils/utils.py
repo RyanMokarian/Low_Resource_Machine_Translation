@@ -108,7 +108,7 @@ def load_training_data(en_path: str,
 
     return train_dataset, valid_dataset
 
-def generate_sentence(indices: typing.List[int], vocab: typing.Dict[str, np.ndarray]):
+def generate_sentence(indices: typing.List[int], vocab: typing.Dict[int, str]):
     """Generate a sentence from a list of indices."""
     sentence = ''
     for idx in indices:
@@ -116,9 +116,13 @@ def generate_sentence(indices: typing.List[int], vocab: typing.Dict[str, np.ndar
             print(f'idx {idx} not in vocab')
             continue
         elif vocab[idx] == PADDING_TOKEN \
+            or vocab[idx] == text_preprocessing.BOS \
             or vocab[idx] == text_preprocessing.EOS:
-            #or vocab[idx] == text_preprocessing.BOS:
             continue
+
         sentence += vocab[int(idx)]
         sentence += ' '
+    
+    sentence = text_preprocessing.recapitalize(sentence)
+
     return sentence
