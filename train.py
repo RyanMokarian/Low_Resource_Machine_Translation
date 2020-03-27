@@ -20,13 +20,15 @@ logger = logging.getLogger()
 # Metrics
 train_accuracy_metric = tf.keras.metrics.SparseCategoricalAccuracy()
 valid_accuracy_metric = tf.keras.metrics.SparseCategoricalAccuracy()
+train_loss_metric = tf.keras.metrics.SparseCategoricalCrossentropy()
+valid_loss_metric = tf.keras.metrics.SparseCategoricalCrossentropy()
 train_bleu_metric = metrics.BleuScore()
 valid_bleu_metric = metrics.BleuScore()
 cross_entropy = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
 def loss_function(y_true, y_pred):
     mask = tf.math.logical_not(tf.math.equal(y_true, 0))
-    y_true, y_pred = y_true[:,1:], y_pred[:,1:] # Ignore BOS token
+    
     loss_ = cross_entropy(y_true, y_pred) 
 
     mask = tf.cast(mask, dtype=loss_.dtype)
@@ -36,34 +38,42 @@ def loss_function(y_true, y_pred):
 
 def train_epoch(model, data_loader, batch_size, optimizer, idx2word_fr):
     train_accuracy_metric.reset_states()
+    train_loss_metric.reset_states()
     train_bleu_metric.reset_states()
     for batch in tqdm(data_loader, desc='train epoch', leave=False):
-        batch['gen_seq_len'] = batch['labels'].shape[1]
-        inputs = batch['inputs']
+        labels = batch['labels']
+        batch['gen_seq_len'] = labels.shape[1]
         with tf.GradientTape() as tape:
             preds = model(batch, training=True)
-            loss = loss_function(y_true=batch['labels'], y_pred=preds)
+            labels, preds = labels[:,1:], preds[:,1:] # Ignore BOS token
+            loss = loss_function(y_true=labels, y_pred=preds)
             
         grads = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
         
-        train_accuracy_metric.update_state(y_true=batch['labels'], y_pred=preds)
-        train_bleu_metric.update_state(y_true=batch['labels'], y_pred=preds, vocab=idx2word_fr)
+        train_accuracy_metric.update_state(y_true=labels, y_pred=preds)
+        train_loss_metric.update_state(y_true=labels, y_pred=preds)
+        train_bleu_metric.update_state(y_true=labels, y_pred=preds, vocab=idx2word_fr)
 
 def test_epoch(model, data_loader, batch_size, idx2word_fr, idx2word_en):
     valid_accuracy_metric.reset_states()
+    valid_loss_metric.reset_states()
     valid_bleu_metric.reset_states()
     for batch in tqdm(data_loader, desc='valid epoch', leave=False):
-        batch['gen_seq_len'] = batch['labels'].shape[1]
+        labels = batch['labels']
+        batch['gen_seq_len'] = labels.shape[1]
+
         preds = model(batch)
-        loss = loss_function(y_true=batch['labels'], y_pred=preds)
+        labels, preds = labels[:,1:], preds[:,1:] # Ignore BOS token
+        loss = loss_function(y_true=labels, y_pred=preds)
 
-        valid_accuracy_metric.update_state(y_true=batch['labels'], y_pred=preds)
-        valid_bleu_metric.update_state(y_true=batch['labels'], y_pred=preds, vocab=idx2word_fr)
+        valid_accuracy_metric.update_state(y_true=labels, y_pred=preds)
+        valid_loss_metric.update_state(y_true=labels, y_pred=preds)
+        valid_bleu_metric.update_state(y_true=labels, y_pred=preds, vocab=idx2word_fr)
 
-    label_sentence = utils.generate_sentence(batch['labels'][0].numpy().astype('int'), idx2word_fr)
+    label_sentence = utils.generate_sentence(labels[0].numpy().astype('int'), idx2word_fr)
     pred_sentence = utils.generate_sentence(np.argmax(preds[0].numpy(), axis=1).astype('int'), idx2word_fr)
-    source_sentence = utils.generate_sentence(batch['inputs'][0].numpy().astype('int'), idx2word_en)
+    source_sentence = utils.generate_sentence(labels[0].numpy().astype('int'), idx2word_en)
     logger.debug(f'Sample : \n    Source : {source_sentence}\n    Pred : {pred_sentence}\n    Label : {label_sentence}')
 
 def main(data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
@@ -114,13 +124,15 @@ def main(data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
     # Training loop
     logger.info('Training...')
 
-    metrics = {'train_accuracy' : [], 'valid_accuracy' : [], 'train_bleu' : [], 'valid_bleu' : []}
+    metrics = {'train_accuracy' : [], 'valid_accuracy' : [], 'train_loss' : [], 'valid_loss' : [], 'train_bleu' : [], 'valid_bleu' : []}
     best_valid_bleu = 0
     for epoch in range(epochs):
         train_epoch(model, train_dataset, batch_size, optimizer, idx2word_fr)
         test_epoch(model, valid_dataset, batch_size, idx2word_fr, idx2word_en)
         train_accuracy = train_accuracy_metric.result().numpy()
         valid_accuracy = valid_accuracy_metric.result().numpy()
+        train_loss = train_loss_metric.result().numpy()
+        valid_loss = valid_loss_metric.result().numpy()
         train_bleu = train_bleu_metric.result()
         valid_bleu = valid_bleu_metric.result()
 
@@ -129,9 +141,12 @@ def main(data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
             utils.save_model(model)
         
         # Logs
-        logger.info(f'Epoch {epoch} - Train BLEU : {train_accuracy:.4f}, Valid BLEU : {valid_accuracy:.4f}')
+        logger.info(f'Epoch {epoch}\n    Train BLEU : {train_bleu:.4f} - Valid BLEU : {valid_bleu:.4f}\n    Train Accuracy : {train_accuracy:.4f} - Valid Accuracy : {valid_accuracy:.4f}\n    Train Loss : {train_loss:.4f} - Valid Loss : {valid_loss:.4f}')
+
         metrics['train_accuracy'].append(train_accuracy)
         metrics['valid_accuracy'].append(valid_accuracy)
+        metrics['train_loss'].append(train_accuracy)
+        metrics['valid_loss'].append(valid_accuracy)
         metrics['train_bleu'].append(train_bleu)
         metrics['valid_bleu'].append(valid_bleu)
 
