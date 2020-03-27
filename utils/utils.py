@@ -4,7 +4,7 @@ import typing
 import numpy as np
 import tensorflow as tf
 
-from process_text import process
+from utils import text_preprocessing
 
 PADDING_TOKEN = '<pad>'
 UNKNOWN_TOKEN = '<unk>'
@@ -35,18 +35,18 @@ def create_vocab(file_path: str, vocab_size: int) -> typing.Dict[str, np.ndarray
     # Get unique words
     unique_words, word_counts = np.unique(words, return_counts=True)
     sorted_unique_words = unique_words[np.argsort(word_counts)[::-1]]
-    
-    if vocab_size is None:
-        vocab_size = len(sorted_unique_words)+1 # +1 for the unknown token
-    assert vocab_size <= len(sorted_unique_words)+1, "vocab_size is too big."
+
+    if vocab_size is None: 
+        vocab_size = len(sorted_unique_words)
+    assert vocab_size <= len(sorted_unique_words), "vocab_size is too big."
     
     # Build vocabulary
-    word2idx = {word:i+1 for i, word in enumerate(sorted_unique_words[:vocab_size-1])}
-    word2idx[UNKNOWN_TOKEN] = vocab_size
-    word2idx[PADDING_TOKEN] = 0
-    idx2word = {i+1:word for i, word in enumerate(sorted_unique_words[:vocab_size-1])}
-    idx2word[vocab_size] = UNKNOWN_TOKEN
+    word2idx = {word:i+1 for i, word in enumerate(sorted_unique_words[:vocab_size])}
+    word2idx[PADDING_TOKEN] = 0 
+    word2idx[UNKNOWN_TOKEN] = vocab_size + 1 
+    idx2word = {i+1:word for i, word in enumerate(sorted_unique_words[:vocab_size])}
     idx2word[0] = PADDING_TOKEN
+    idx2word[vocab_size+1] = UNKNOWN_TOKEN
 
     return word2idx, idx2word
     
@@ -58,7 +58,7 @@ def get_sentences(file_path: str) -> typing.List[typing.List[str]]:
     # Split on words
     sentences = []
     for line in lines:
-        line = process(line)
+        line = text_preprocessing.process(line)
         sentences.append(line.split())
         
     return sentences
@@ -95,7 +95,7 @@ def load_training_data(en_path: str,
     train_y = sentence_to_vocab(sentences_fr, vocab_fr)
     
     # Split in train and valid
-    cuttoff_idx = int(np.round(len(train_X)*valid_ratio))
+    cuttoff_idx = int(np.round(len(train_X)*(1-valid_ratio)))
     train_X, valid_X = train_X[:cuttoff_idx], train_X[cuttoff_idx:]
     train_y, valid_y = train_y[:cuttoff_idx], train_y[cuttoff_idx:]
     
@@ -114,6 +114,10 @@ def generate_sentence(indices: typing.List[int], vocab: typing.Dict[str, np.ndar
     for idx in indices:
         if int(idx) not in vocab:
             print(f'idx {idx} not in vocab')
+            continue
+        elif vocab[idx] == PADDING_TOKEN \
+            or vocab[idx] == text_preprocessing.EOS:
+            #or vocab[idx] == text_preprocessing.BOS:
             continue
         sentence += vocab[int(idx)]
         sentence += ' '

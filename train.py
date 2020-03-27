@@ -11,6 +11,7 @@ from models.seq2seq_gru import Seq2SeqGRU
 from utils import utils
 from utils import logging
 from utils import plots
+from utils import metrics
 
 SEED = 1
 
@@ -19,6 +20,8 @@ logger = logging.getLogger()
 # Metrics
 train_accuracy_metric = tf.keras.metrics.SparseCategoricalAccuracy()
 valid_accuracy_metric = tf.keras.metrics.SparseCategoricalAccuracy()
+train_bleu_metric = metrics.BleuScore()
+valid_bleu_metric = metrics.BleuScore()
 cross_entropy = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
 def loss_function(y_true, y_pred):
@@ -30,8 +33,9 @@ def loss_function(y_true, y_pred):
 
     return tf.reduce_mean(loss_)
 
-def train_epoch(model, data_loader, batch_size, optimizer):
+def train_epoch(model, data_loader, batch_size, optimizer, idx2word_fr):
     train_accuracy_metric.reset_states()
+    train_bleu_metric.reset_states()
     for batch in tqdm(data_loader, desc='train epoch', leave=False):
         batch['gen_seq_len'] = batch['labels'].shape[1]
         inputs = batch['inputs']
@@ -42,19 +46,19 @@ def train_epoch(model, data_loader, batch_size, optimizer):
         grads = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-        train_accuracy_metric.update_state(y_true=batch['labels'], y_pred=preds)
-
 def test_epoch(model, data_loader, batch_size, idx2word_fr):
     valid_accuracy_metric.reset_states()
-    for batch in tqdm(data_loader, desc='train epoch', leave=False):
+    valid_bleu_metric.reset_states()
+    for batch in tqdm(data_loader, desc='valid epoch', leave=False):
         batch['gen_seq_len'] = batch['labels'].shape[1]
         preds = model(batch)
         loss = loss_function(y_true=batch['labels'], y_pred=preds)
 
         valid_accuracy_metric.update_state(y_true=batch['labels'], y_pred=preds)
+        valid_bleu_metric.update_state(y_true=batch['labels'], y_pred=preds, vocab=idx2word_fr)
 
     label_sentence = utils.generate_sentence(batch['labels'][0].numpy().astype('int'), idx2word_fr)
-    pred_sentence = utils.generate_sentence(np.argmax(preds[0].numpy().astype('int'), axis=1), idx2word_fr)
+    pred_sentence = utils.generate_sentence(np.argmax(preds[0].numpy(), axis=1).astype('int'), idx2word_fr)
     logger.debug(f'Sample : \n  Label : {label_sentence}\n  Pred : {pred_sentence}')
 
 def main(data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
@@ -105,23 +109,27 @@ def main(data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
     # Training loop
     logger.info('Training...')
 
-    metrics = {'train_accuracy' : [], 'valid_accuracy' : []}
-    best_valid_accuracy = 0
+    metrics = {'train_accuracy' : [], 'valid_accuracy' : [], 'train_bleu' : [], 'valid_bleu' : []}
+    best_valid_bleu = 0
     for epoch in range(epochs):
-        train_epoch(model, train_dataset, batch_size, optimizer)
+        train_epoch(model, train_dataset, batch_size, optimizer, idx2word_fr)
         test_epoch(model, valid_dataset, batch_size, idx2word_fr)
-        train_accuracy = np.sqrt(train_accuracy_metric.result().numpy())
-        valid_accuracy = np.sqrt(valid_accuracy_metric.result().numpy())
+        train_accuracy = train_accuracy_metric.result().numpy()
+        valid_accuracy = valid_accuracy_metric.result().numpy()
+        train_bleu = train_bleu_metric.result()
+        valid_bleu = valid_bleu_metric.result()
 
-        if valid_accuracy > best_valid_accuracy:
-            best_valid_accuracy = valid_accuracy
+        if valid_bleu > best_valid_bleu:
+            best_valid_bleu = valid_bleu
             utils.save_model(model)
         
         # Logs
-        logger.info(f'Epoch {epoch} - Train Accuracy : {train_accuracy:.4f}, Valid Accuracy : {valid_accuracy:.4f}')
+        logger.info(f'Epoch {epoch} - Train BLEU : {train_accuracy:.4f}, Valid BLEU : {valid_accuracy:.4f}')
         metrics['train_accuracy'].append(train_accuracy)
         metrics['valid_accuracy'].append(valid_accuracy)
-            
+        metrics['train_bleu'].append(train_bleu)
+        metrics['valid_bleu'].append(valid_bleu)
+
     # Plot losses
     plots.plot_accuracy(metrics['train_accuracy'], metrics['valid_accuracy'])
 

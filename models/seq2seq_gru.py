@@ -21,10 +21,11 @@ class Seq2SeqGRU(tf.keras.Model):
         encoder_output, encoder_hidden = self.encoder(inputs, self.encoder.initialize_hidden_state())
 
         decoder_hidden = encoder_hidden
-        # TODO : Change the line below to this one -> decoder_input = tf.expand_dims([self.vocab_fr['<start>']] * self.batch_size, 1)
-        decoder_input = tf.expand_dims([0] * self.batch_size, 1)
+        decoder_input = tf.expand_dims([self.vocab_fr['<start>']] * self.batch_size, 1)
+
         predicted_seq = []
-        for t in range(gen_seq_len):
+        predicted_seq.append(tf.one_hot([self.vocab_fr['<start>']] * self.batch_size, len(self.vocab_fr), dtype=tf.float32)) # <start> is the first prediction
+        for t in range(1, gen_seq_len):
             predictions, decoder_hidden, _ = self.decoder(decoder_input, decoder_hidden, encoder_output)
             predicted_seq.append(predictions)
 
@@ -73,7 +74,7 @@ class Decoder(tf.keras.Model):
 
         # x shape after passing through embedding == (batch_size, 1, embedding_dim)
         x = self.embedding(x)
-        
+
         # x shape after concatenation == (batch_size, 1, embedding_dim + hidden_size)
         x = tf.concat([tf.expand_dims(context_vector, 1), x], axis=-1)
 

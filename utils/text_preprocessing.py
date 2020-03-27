@@ -2,7 +2,7 @@ import re
 
 import numpy as np
 
-BOS, EOS, TK_MAJ, TK_UP, TK_NUM = 'xxstart', 'xxend', 'xxmaj','xxup', 'xxnum'
+BOS, EOS, TK_MAJ, TK_UP, TK_NUM = '<start>', '<end>', '<maj>', '<up>', '<num>'
 
 def regx(x):
     """Some character level processing"""
@@ -34,8 +34,11 @@ def replace_all_caps(x):
     """Replace tokens in ALL CAPS in `x` by their lower version and add `TK_UP` before."""
     res = []
     for t in x:
-        if t.isupper() and len(t) > 1: res.append(TK_UP); res.append(t.lower())
-        else: res.append(t)
+        if t.isupper() and len(t) > 1: 
+            res.append(TK_UP)
+            res.append(t.lower())
+        else: 
+            res.append(t)
     return res
 
 def deal_caps(x):
