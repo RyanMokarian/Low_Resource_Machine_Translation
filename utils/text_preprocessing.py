@@ -2,7 +2,7 @@ import re
 
 import numpy as np
 
-BOS, EOS, TK_MAJ, TK_UP, TK_NUM = 'xxstart', 'xxend', 'xxmaj','xxup', 'xxnum'
+BOS, EOS, TK_MAJ, TK_UP, TK_NUM = '<start>', '<end>', '<maj>', '<up>', '<num>'
 
 def regx(x):
     """Some character level processing"""
@@ -34,11 +34,14 @@ def replace_all_caps(x):
     """Replace tokens in ALL CAPS in `x` by their lower version and add `TK_UP` before."""
     res = []
     for t in x:
-        if t.isupper() and len(t) > 1: res.append(TK_UP); res.append(t.lower())
-        else: res.append(t)
+        if t.isupper() and len(t) > 1: 
+            res.append(TK_UP)
+            res.append(t.lower())
+        else: 
+            res.append(t)
     return res
 
-def deal_caps(x):
+def replace_caps(x):
     """Replace all Capitalized tokens in `x` by their lower version and add `TK_MAJ` before."""
     res = []
     for t in x:
@@ -51,7 +54,27 @@ def deal_caps(x):
 def process(x):
     x = regx(x.strip())
     x = x.split()
-    post = [deal_caps, replace_all_caps, start_end]
+    post = [replace_caps, replace_all_caps, start_end]
     for p in post:
         x = p(x)
     return ' '.join(x)
+
+def recapitalize(x: str):
+    """Remove <maj> tokens and <up> tokens and capitalize the letters."""
+    allcap = False
+    cap = False
+    res = []
+    for t in x.split():
+        if allcap:
+            res.append(t.upper())
+            allcap = False
+        elif cap:
+            res.append(t[0].upper() + t[1:])
+            cap = False
+        elif t == TK_UP:
+            allcap = True
+        elif t == TK_MAJ:
+            cap = True
+        else:
+            res.append(t)
+    return ' '.join(res)

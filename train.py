@@ -11,6 +11,7 @@ from models.seq2seq_gru import Seq2SeqGRU
 from utils import utils
 from utils import logging
 from utils import plots
+from utils import metrics
 
 SEED = 1
 
@@ -19,52 +20,70 @@ logger = logging.getLogger()
 # Metrics
 train_accuracy_metric = tf.keras.metrics.SparseCategoricalAccuracy()
 valid_accuracy_metric = tf.keras.metrics.SparseCategoricalAccuracy()
-cross_entropy = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+train_loss_metric = tf.keras.metrics.SparseCategoricalCrossentropy()
+valid_loss_metric = tf.keras.metrics.SparseCategoricalCrossentropy()
+train_bleu_metric = metrics.BleuScore()
+valid_bleu_metric = metrics.BleuScore()
+cross_entropy = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 
 def loss_function(y_true, y_pred):
     mask = tf.math.logical_not(tf.math.equal(y_true, 0))
-    loss_ = cross_entropy(y_true, y_pred)
+    
+    loss_ = cross_entropy(y_true, y_pred) 
 
     mask = tf.cast(mask, dtype=loss_.dtype)
     loss_ *= mask
 
     return tf.reduce_mean(loss_)
 
-def train_epoch(model, data_loader, batch_size, optimizer):
+def train_epoch(model, data_loader, optimizer, batch_nb, idx2word_fr):
     train_accuracy_metric.reset_states()
-    for batch in tqdm(data_loader, desc='train epoch', leave=False):
-        batch['gen_seq_len'] = batch['labels'].shape[1]
-        inputs = batch['inputs']
+    train_loss_metric.reset_states()
+    train_bleu_metric.reset_states()
+    for batch in tqdm(data_loader, total=batch_nb, desc='train epoch', leave=False):
+        labels = batch['labels']
+        batch['gen_seq_len'] = labels.shape[1]
         with tf.GradientTape() as tape:
             preds = model(batch, training=True)
-            loss = loss_function(y_true=batch['labels'], y_pred=preds)
+            labels, preds = labels[:,1:], preds[:,1:] # Ignore BOS token
+            loss = loss_function(y_true=labels, y_pred=preds)
             
         grads = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
+        
+        train_accuracy_metric.update_state(y_true=labels, y_pred=preds)
+        train_loss_metric.update_state(y_true=labels, y_pred=preds)
+        train_bleu_metric.update_state(y_true=labels, y_pred=preds, vocab=idx2word_fr)
 
-        train_accuracy_metric.update_state(y_true=batch['labels'], y_pred=preds)
-
-def test_epoch(model, data_loader, batch_size, idx2word_fr):
+def test_epoch(model, data_loader, batch_nb, idx2word_fr, idx2word_en):
     valid_accuracy_metric.reset_states()
-    for batch in tqdm(data_loader, desc='train epoch', leave=False):
-        batch['gen_seq_len'] = batch['labels'].shape[1]
+    valid_loss_metric.reset_states()
+    valid_bleu_metric.reset_states()
+    for batch in tqdm(data_loader, total=batch_nb, desc='valid epoch', leave=False):
+        labels = batch['labels']
+        batch['gen_seq_len'] = labels.shape[1]
+
         preds = model(batch)
-        loss = loss_function(y_true=batch['labels'], y_pred=preds)
+        labels, preds = labels[:,1:], preds[:,1:] # Ignore BOS token
+        loss = loss_function(y_true=labels, y_pred=preds)
 
-        valid_accuracy_metric.update_state(y_true=batch['labels'], y_pred=preds)
+        valid_accuracy_metric.update_state(y_true=labels, y_pred=preds)
+        valid_loss_metric.update_state(y_true=labels, y_pred=preds)
+        valid_bleu_metric.update_state(y_true=labels, y_pred=preds, vocab=idx2word_fr)
 
-    label_sentence = utils.generate_sentence(batch['labels'][0].numpy().astype('int'), idx2word_fr)
-    pred_sentence = utils.generate_sentence(np.argmax(preds[0].numpy().astype('int'), axis=1), idx2word_fr)
-    logger.debug(f'Sample : \n  Label : {label_sentence}\n  Pred : {pred_sentence}')
+    label_sentence = utils.generate_sentence(batch['inputs'].numpy().astype('int'), idx2word_fr)
+    pred_sentence = utils.generate_sentence(np.argmax(preds[0].numpy(), axis=1).astype('int'), idx2word_fr)
+    source_sentence = utils.generate_sentence(labels[0].numpy().astype('int'), idx2word_en)
+    logger.debug(f'Sample : \n    Source : {source_sentence}\n    Pred : {pred_sentence}\n    Label : {label_sentence}')
 
 def main(data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
-         model: str = 'gru',
+         model: str = 'seq2seqgru',
          epochs: int = 10,
          optimizer: str = 'adam',
          lr: float = 1e-4, 
-         batch_size: int = 100,
+         batch_size: int = 32,
          vocab_size: int = None, # If None all tokens of will be in vocab
-         seq_len: int = 20, # If None the seq len is dynamic (might not work with all models)
+         seq_len: int = None, # If None the seq len is dynamic (might not work with all models)
          seed: bool = True
         ):
     # Call to remove tensorflow warning about casting float64 to float32
@@ -89,39 +108,52 @@ def main(data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
     path_fr = os.path.join(data_dir, 'train.lang2')
     word2idx_en, idx2word_en = utils.create_vocab(path_en, vocab_size)
     word2idx_fr, idx2word_fr = utils.create_vocab(path_fr, vocab_size)
+    logger.info(f'Size of english vocab : {len(word2idx_en)}, size of french vocab : {len(word2idx_fr)}')
+
     
     # Load datasets
     logger.info('Loading datasets...')
-    train_dataset, valid_dataset = utils.load_training_data(path_en, path_fr, word2idx_en, word2idx_fr, seq_len, batch_size)
-
+    train_dataset, valid_dataset, nb_train_ex, nb_valid_ex = utils.load_training_data(path_en, path_fr, word2idx_en, word2idx_fr, seq_len, batch_size)
+    logger.info(f'Number of training examples : {nb_train_ex}, number of valid examples : {nb_valid_ex}')
     # Create model
     if model == 'gru':
         model = baselines.GRU(len(word2idx_fr), batch_size)
     elif model == 'seq2seqgru':
-        model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, embedding_dim=256, encoder_units=256, decoder_units=256, attention_units=256)
+        model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, embedding_dim=64, encoder_units=256, decoder_units=256, attention_units=10)
+        # model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, embedding_dim=256, encoder_units=1024, decoder_units=1024, attention_units=10)
+
     else:
         raise Exception(f'Model "{model}" not recognized.')
     
     # Training loop
     logger.info('Training...')
 
-    metrics = {'train_accuracy' : [], 'valid_accuracy' : []}
-    best_valid_accuracy = 0
+    metrics = {'train_accuracy' : [], 'valid_accuracy' : [], 'train_loss' : [], 'valid_loss' : [], 'train_bleu' : [], 'valid_bleu' : []}
+    best_valid_bleu = 0
     for epoch in range(epochs):
-        train_epoch(model, train_dataset, batch_size, optimizer)
-        test_epoch(model, valid_dataset, batch_size, idx2word_fr)
-        train_accuracy = np.sqrt(train_accuracy_metric.result().numpy())
-        valid_accuracy = np.sqrt(valid_accuracy_metric.result().numpy())
+        train_epoch(model, train_dataset, optimizer, np.ceil(nb_train_ex/batch_size), idx2word_fr)
+        test_epoch(model, valid_dataset, np.ceil(nb_valid_ex/batch_size), idx2word_fr, idx2word_en)
+        train_accuracy = train_accuracy_metric.result().numpy()
+        valid_accuracy = valid_accuracy_metric.result().numpy()
+        train_loss = train_loss_metric.result().numpy()
+        valid_loss = valid_loss_metric.result().numpy()
+        train_bleu = train_bleu_metric.result()
+        valid_bleu = valid_bleu_metric.result()
 
-        if valid_accuracy > best_valid_accuracy:
-            best_valid_accuracy = valid_accuracy
+        if valid_bleu > best_valid_bleu:
+            best_valid_bleu = valid_bleu
             utils.save_model(model)
         
         # Logs
-        logger.info(f'Epoch {epoch} - Train Accuracy : {train_accuracy:.4f}, Valid Accuracy : {valid_accuracy:.4f}')
+        logger.info(f'Epoch {epoch}\n    Train BLEU : {train_bleu:.4f} - Valid BLEU : {valid_bleu:.4f}\n    Train Accuracy : {train_accuracy:.4f} - Valid Accuracy : {valid_accuracy:.4f}\n    Train Loss : {train_loss:.4f} - Valid Loss : {valid_loss:.4f}')
+
         metrics['train_accuracy'].append(train_accuracy)
         metrics['valid_accuracy'].append(valid_accuracy)
-            
+        metrics['train_loss'].append(train_accuracy)
+        metrics['valid_loss'].append(valid_accuracy)
+        metrics['train_bleu'].append(train_bleu)
+        metrics['valid_bleu'].append(valid_bleu)
+
     # Plot losses
     plots.plot_accuracy(metrics['train_accuracy'], metrics['valid_accuracy'])
 
