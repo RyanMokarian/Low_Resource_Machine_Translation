@@ -11,7 +11,7 @@ class Seq2SeqGRU(tf.keras.Model):
         self.batch_size = batch_size
         self.vocab_fr = vocab_fr
         self.encoder = Encoder(vocab_size_en, embedding_dim, encoder_units, batch_size)
-        self.decoder = Decoder(len(vocab_fr), embedding_dim, decoder_units, batch_size)
+        self.decoder = Decoder(len(vocab_fr), embedding_dim, decoder_units, attention_units)
    
     def call(self, batch, training=False):
         # Unpack inputs
@@ -54,19 +54,17 @@ class Encoder(tf.keras.Model):
         return tf.zeros((self.batch_size, self.enc_units))
 
 class Decoder(tf.keras.Model):
-    def __init__(self, vocab_size, embedding_dim, decoder_units, batch_size):
+    def __init__(self, vocab_size, embedding_dim, decoder_units, attention_units):
         super(Decoder, self).__init__()
-        self.batch_size = batch_size
-        self.decoder_units = decoder_units
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-        self.gru = tf.keras.layers.GRU(self.decoder_units,
+        self.gru = tf.keras.layers.GRU(decoder_units,
                                     return_sequences=True,
                                     return_state=True,
                                     recurrent_initializer='glorot_uniform')
         self.fc = tf.keras.layers.Dense(vocab_size)
 
         # used for attention
-        self.attention = Attention(self.decoder_units)
+        self.attention = Attention(attention_units)
 
     def call(self, x, hidden, enc_output):
         # enc_output shape == (batch_size, max_length, hidden_size)

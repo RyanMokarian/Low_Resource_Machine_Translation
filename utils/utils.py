@@ -106,7 +106,7 @@ def load_training_data(en_path: str,
                                                    output_shapes={'inputs':tf.TensorShape([None]), 'labels':tf.TensorShape([None])}) \
                                    .padded_batch(batch_size, drop_remainder=True, padded_shapes={'inputs':[seq_len], 'labels':[seq_len]})
 
-    return train_dataset, valid_dataset
+    return train_dataset, valid_dataset, len(train_y), len(valid_y)
 
 def generate_sentence(indices: typing.List[int], vocab: typing.Dict[int, str]):
     """Generate a sentence from a list of indices."""
