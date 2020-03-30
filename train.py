@@ -71,17 +71,18 @@ def test_epoch(model, data_loader, batch_nb, idx2word_fr, idx2word_en):
         valid_loss_metric.update_state(y_true=labels, y_pred=preds)
         valid_bleu_metric.update_state(y_true=labels, y_pred=preds, vocab=idx2word_fr)
 
-    label_sentence = utils.generate_sentence(batch['inputs'].numpy().astype('int'), idx2word_fr)
-    pred_sentence = utils.generate_sentence(np.argmax(preds[0].numpy(), axis=1).astype('int'), idx2word_fr)
-    source_sentence = utils.generate_sentence(labels[0].numpy().astype('int'), idx2word_en)
-    logger.debug(f'Sample : \n    Source : {source_sentence}\n    Pred : {pred_sentence}\n    Label : {label_sentence}')
+    for i in range(3):
+        label_sentence = utils.generate_sentence(labels[i].numpy().astype('int'), idx2word_fr)
+        pred_sentence = utils.generate_sentence(np.argmax(preds[i].numpy(), axis=1).astype('int'), idx2word_fr)
+        source_sentence = utils.generate_sentence(batch['inputs'][i].numpy().astype('int'), idx2word_en)
+        logger.debug(f'Sample : \n    Source : {source_sentence}\n    Pred : {pred_sentence}\n    Label : {label_sentence}')
 
 def main(data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
          model: str = 'seq2seqgru',
-         epochs: int = 10,
+         epochs: int = 30,
          optimizer: str = 'adam',
-         lr: float = 1e-4, 
-         batch_size: int = 32,
+         lr: float = 1e-3, 
+         batch_size: int = 64,
          vocab_size: int = None, # If None all tokens of will be in vocab
          seq_len: int = None, # If None the seq len is dynamic (might not work with all models)
          seed: bool = True
@@ -109,7 +110,6 @@ def main(data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
     word2idx_en, idx2word_en = utils.create_vocab(path_en, vocab_size)
     word2idx_fr, idx2word_fr = utils.create_vocab(path_fr, vocab_size)
     logger.info(f'Size of english vocab : {len(word2idx_en)}, size of french vocab : {len(word2idx_fr)}')
-
     
     # Load datasets
     logger.info('Loading datasets...')
@@ -119,7 +119,7 @@ def main(data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
     if model == 'gru':
         model = baselines.GRU(len(word2idx_fr), batch_size)
     elif model == 'seq2seqgru':
-        model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, embedding_dim=64, encoder_units=256, decoder_units=256, attention_units=10)
+        model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, embedding_dim=256, encoder_units=512, decoder_units=512)
         # model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, embedding_dim=256, encoder_units=1024, decoder_units=1024, attention_units=10)
 
     else:
