@@ -2,7 +2,7 @@
 import sacrebleu
 import numpy as np
 import tensorflow as tf
-K = tf.keras.backend  # Alias to Keras' backend namespace.
+import tf.keras.backend as K  # Alias to Keras' backend namespace.
 
 from utils import utils
 
