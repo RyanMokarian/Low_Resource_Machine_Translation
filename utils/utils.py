@@ -63,6 +63,12 @@ def get_sentences(file_path: str) -> typing.List[typing.List[str]]:
         
     return sentences
 
+def sort(x,y):
+    """ Sort data according to len when using dynamic seq_len for efficient batching."""
+    idx = np.argsort([len(ip) for ip in x])
+    return x[idx], y[idx]
+
+
 def load_training_data(en_path: str,
                        fr_path: str, 
                        vocab_en: typing.Dict[str, np.ndarray], 
@@ -99,12 +105,17 @@ def load_training_data(en_path: str,
     train_X, valid_X = train_X[:cuttoff_idx], train_X[cuttoff_idx:]
     train_y, valid_y = train_y[:cuttoff_idx], train_y[cuttoff_idx:]
     
+    if not seq_len: 
+        train_X, train_y = sort(train_X, train_y)
+        valid_X, valid_y = sort(valid_X, valid_y)
+
     train_dataset = tf.data.Dataset.from_generator(lambda: [{'inputs':x, 'labels':y} for x, y in zip(train_X, train_y)], {'inputs':tf.int64, 'labels':tf.int64}, 
                                                    output_shapes={'inputs':tf.TensorShape([None]), 'labels':tf.TensorShape([None])}) \
-                                   .padded_batch(batch_size, drop_remainder=True, padded_shapes={'inputs':[seq_len], 'labels':[seq_len]})
+                                   .shuffle(batch_size*3)\
+                                   .padded_batch(batch_size, drop_remainder=False, padded_shapes={'inputs':[seq_len], 'labels':[seq_len]})
     valid_dataset = tf.data.Dataset.from_generator(lambda:  [{'inputs':x, 'labels':y} for x, y in zip(valid_X, valid_y)], {'inputs':tf.int64, 'labels':tf.int64},
                                                    output_shapes={'inputs':tf.TensorShape([None]), 'labels':tf.TensorShape([None])}) \
-                                   .padded_batch(batch_size, drop_remainder=True, padded_shapes={'inputs':[seq_len], 'labels':[seq_len]})
+                                   .padded_batch(batch_size, drop_remainder=False, padded_shapes={'inputs':[seq_len], 'labels':[seq_len]})
 
     return train_dataset, valid_dataset, len(train_y), len(valid_y)
 
