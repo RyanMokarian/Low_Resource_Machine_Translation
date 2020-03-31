@@ -3,12 +3,17 @@ import typing
 
 import numpy as np
 import tensorflow as tf
+import fasttext
 
+from utils import logging
 from utils import text_preprocessing
 
 PADDING_TOKEN = '<pad>'
 UNKNOWN_TOKEN = '<unk>'
 SAVED_MODEL_DIR = 'saved_model'
+SHARED_PATH = '/project/cq-training-1/project2/teams/team12/'
+
+logger = logging.getLogger()
 
 def create_folder(path: str):
     """ This function creates a folder if it does not already exists."""
@@ -21,6 +26,24 @@ def save_model(model: tf.keras.Model):
     model_path = os.path.join(SAVED_MODEL_DIR, model.__class__.__name__)
     create_folder(model_path)
     model.save_weights(os.path.join(model_path, "model"))
+
+def create_fasttext_embedding(file_path: str, vocab_size: int) -> typing.Dict[str, np.ndarray]:
+    """Train a fasttext model and return the embeddings."""
+    
+    model_path = os.path.join(SHARED_PATH, 'embedding_models', 'fasttext_model.bin')
+    
+    if os.path.exists(model_path):
+        logger.info('Loading fasttext embeddings...')
+        model = fasttext.load_model(model_path)
+    else:
+        logger.info('Training fasttext embeddings...')
+        model = fasttext.train_unsupervised(file_path, model='skipgram')
+        model.save_model(model_path)
+
+    # vec2word = {model[word]:word for word in model.words}
+    word2vec = {word:model[word] for word in model.words}
+
+    return word2vec, None
 
 def create_vocab(file_path: str, vocab_size: int) -> typing.Dict[str, np.ndarray]:
     """Returns a dictionary that maps words to one hot embeddings"""
@@ -83,7 +106,7 @@ def load_training_data(en_path: str,
                 if sentences[i][j] in vocab:
                     sentence.append(vocab[sentences[i][j]])
                 else:
-                    sentence.append(vocab[UNKNOWN_TOKEN])
+                    sentence.append(vocab['unknown'])
             data.append(np.array(sentence))
         return np.array(data)
     # Get sentences
@@ -100,11 +123,11 @@ def load_training_data(en_path: str,
     train_y, valid_y = train_y[:cuttoff_idx], train_y[cuttoff_idx:]
     
     train_dataset = tf.data.Dataset.from_generator(lambda: [{'inputs':x, 'labels':y} for x, y in zip(train_X, train_y)], {'inputs':tf.int64, 'labels':tf.int64}, 
-                                                   output_shapes={'inputs':tf.TensorShape([None]), 'labels':tf.TensorShape([None])}) \
-                                   .padded_batch(batch_size, drop_remainder=True, padded_shapes={'inputs':[seq_len], 'labels':[seq_len]})
+                                                   output_shapes={'inputs':tf.TensorShape([None, None]), 'labels':tf.TensorShape([None])}) \
+                                   .padded_batch(batch_size, drop_remainder=True, padded_shapes={'inputs':[seq_len, None], 'labels':[seq_len]})
     valid_dataset = tf.data.Dataset.from_generator(lambda:  [{'inputs':x, 'labels':y} for x, y in zip(valid_X, valid_y)], {'inputs':tf.int64, 'labels':tf.int64},
-                                                   output_shapes={'inputs':tf.TensorShape([None]), 'labels':tf.TensorShape([None])}) \
-                                   .padded_batch(batch_size, drop_remainder=True, padded_shapes={'inputs':[seq_len], 'labels':[seq_len]})
+                                                   output_shapes={'inputs':tf.TensorShape([None, None]), 'labels':tf.TensorShape([None])}) \
+                                   .padded_batch(batch_size, drop_remainder=True, padded_shapes={'inputs':[seq_len, None], 'labels':[seq_len]})
 
     return train_dataset, valid_dataset, len(train_y), len(valid_y)
 
