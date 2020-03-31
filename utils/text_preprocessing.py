@@ -9,7 +9,7 @@ def regx(x):
     # Remove space, comma or point  between numbers
     x = re.sub(r"(\d+)[\s+|,|.](\d+)",r"\1\2",x)
     # Replace ’ with ' 
-    x = re.sub("’","'",x)
+    x = re.sub("’|‘","'",x)
     # Replace numbers with TK_NUM
     x = re.sub("\d+",TK_NUM,x)
     # Remove some punctuation
@@ -46,15 +46,20 @@ def replace_caps(x):
     res = []
     for t in x:
         if t == '': continue
-        if t[0].isupper() and len(t) > 1 and (t[1:].islower() or (t[1] == "’" or t[1] == "'" )): 
-            res.append(TK_MAJ)
+        if t[0].isupper():
+            if len(t) == 1 and t[0] == 'I':
+                res.append(TK_MAJ)
+            if len(t) >1 and (t[1:].islower() or (t[1] == "’" or t[1] == "'" )):
+                res.append(TK_MAJ)
         res.append(t.lower())
     return res
 
-def process(x):
+def process(x,pretrain=False):
     x = regx(x.strip())
     x = x.split()
-    post = [replace_caps, replace_all_caps, start_end]
+    post = [replace_caps, replace_all_caps]
+    if not pretrain:
+        post.append(start_end)
     for p in post:
         x = p(x)
     return ' '.join(x)
