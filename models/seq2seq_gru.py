@@ -2,31 +2,37 @@
 # Most of the code comes from a tensorflow tutorial (https://www.tensorflow.org/tutorials/text/nmt_with_attention)
 # and was adapted for this project.
 #
-
+import pdb
 import tensorflow as tf
 
 class Seq2SeqGRU(tf.keras.Model):
-    def __init__(self, vocab_size_en, vocab_fr, batch_size, embedding_dim, encoder_units, decoder_units, attention_units):
+    def __init__(self, vocab_size_en, vocab_fr, embedding_dim, encoder_units, decoder_units, attention_units):
         super(Seq2SeqGRU, self).__init__()
-        self.batch_size = batch_size
-        self.vocab_fr = vocab_fr
-        self.encoder = Encoder(vocab_size_en, embedding_dim, encoder_units, batch_size)
-        self.decoder = Decoder(len(vocab_fr), embedding_dim, decoder_units, attention_units)
+        self.en_sz, self.fr_sz = vocab_size_en, len(vocab_fr)  # help capture in model_name
+        self.vocab_fr, self.embedding_dim  = vocab_fr, embedding_dim
+        self.encoder_units, self.decoder_units, self.attention_units = encoder_units, decoder_units, attention_units
+
+        self.encoder = Encoder(vocab_size_en, embedding_dim, encoder_units)
+        self.decoder = Decoder(self.fr_sz, embedding_dim, decoder_units, attention_units)
    
     def call(self, batch, training=False):
         # Unpack inputs
         inputs, gen_seq_len = batch['inputs'], batch['gen_seq_len']
+        batch_size = inputs.shape[0] # infer batch_size on run time
         targets = batch['labels'] if training else None
-
-        encoder_output, encoder_hidden = self.encoder(inputs, self.encoder.initialize_hidden_state())
+        
+        encoder_output, encoder_hidden = self.encoder(inputs)
 
         decoder_hidden = encoder_hidden
-        decoder_input = tf.expand_dims([self.vocab_fr['<start>']] * self.batch_size, 1)
+        decoder_input = tf.expand_dims([self.vocab_fr['<start>']] * batch_size, 1)
 
         predicted_seq = []
-        predicted_seq.append(tf.one_hot([self.vocab_fr['<start>']] * self.batch_size, len(self.vocab_fr), dtype=tf.float32)) # <start> is the first prediction
+        predicted_seq.append(tf.one_hot([self.vocab_fr['<start>']] * batch_size, len(self.vocab_fr), dtype=tf.float32)) # <start> is the first prediction
         for t in range(1, gen_seq_len):
-            predictions, decoder_hidden, _ = self.decoder(decoder_input, decoder_hidden, encoder_output)
+                    # initialize decoder hidden state with zeros 
+            if t == 1: predictions, decoder_hidden, _ = self.decoder(decoder_input, decoder_hidden, encoder_output, None)
+                    # carry over decoder hidden state
+            else: predictions, decoder_hidden, _ = self.decoder(decoder_input, decoder_hidden, encoder_output, decoder_hidden)
             predicted_seq.append(predictions)
 
             # using teacher forcing if training
@@ -35,9 +41,8 @@ class Seq2SeqGRU(tf.keras.Model):
         return tf.stack(predicted_seq, axis=1)
 
 class Encoder(tf.keras.Model):
-    def __init__(self, vocab_size, embedding_dim, enc_units, batch_size):
+    def __init__(self, vocab_size, embedding_dim, enc_units):
         super(Encoder, self).__init__()
-        self.batch_size = batch_size
         self.enc_units = enc_units
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
         self.gru = tf.keras.layers.GRU(self.enc_units,
@@ -45,13 +50,12 @@ class Encoder(tf.keras.Model):
                                     return_state=True,
                                     recurrent_initializer='glorot_uniform')
 
-    def call(self, x, hidden):
+    def call(self, x):
         x = self.embedding(x)
-        output, state = self.gru(x, initial_state = hidden)
+        # None initalizes with zeros and takes care of batch_size
+        output, state = self.gru(x,initial_state=None)
         return output, state
 
-    def initialize_hidden_state(self):
-        return tf.zeros((self.batch_size, self.enc_units))
 
 class Decoder(tf.keras.Model):
     def __init__(self, vocab_size, embedding_dim, decoder_units, attention_units):
@@ -66,10 +70,10 @@ class Decoder(tf.keras.Model):
         # used for attention
         self.attention = Attention(attention_units)
 
-    def call(self, x, hidden, enc_output):
+    def call(self, x, hidden, enc_output, init_state):
         # enc_output shape == (batch_size, max_length, hidden_size)
         context_vector, attention_weights = self.attention(hidden, enc_output)
-
+        #pdb.set_trace()
         # x shape after passing through embedding == (batch_size, 1, embedding_dim)
         x = self.embedding(x)
 
@@ -77,7 +81,8 @@ class Decoder(tf.keras.Model):
         x = tf.concat([tf.expand_dims(context_vector, 1), x], axis=-1)
 
         # passing the concatenated vector to the GRU
-        output, state = self.gru(x)
+        # let the decoder carry it's hidden state, change to None if not required
+        output, state = self.gru(x,initial_state=init_state)
 
         # output shape == (batch_size * 1, hidden_size)
         output = tf.reshape(output, (-1, output.shape[2]))

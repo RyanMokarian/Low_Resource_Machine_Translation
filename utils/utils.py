@@ -1,26 +1,37 @@
 import os
 import typing
+import pickle
+import pdb
 
 import numpy as np
 import tensorflow as tf
 
 from utils import text_preprocessing
+from utils import logging
+
+logger = logging.getLogger()
 
 PADDING_TOKEN = '<pad>'
 UNKNOWN_TOKEN = '<unk>'
-SAVED_MODEL_DIR = 'saved_model'
+SAVED_MODEL_DIR = '../saved_model'
 
 def create_folder(path: str):
     """ This function creates a folder if it does not already exists."""
     if not os.path.exists(path):
         os.mkdir(path)
 
-def save_model(model: tf.keras.Model):
+def save_model(model: tf.keras.Model, name = None):
     """ This function saves the model to disk."""
     create_folder(SAVED_MODEL_DIR)
-    model_path = os.path.join(SAVED_MODEL_DIR, model.__class__.__name__)
+    if name: model_path = os.path.join(SAVED_MODEL_DIR, name) 
+    else: model_path = os.path.join(SAVED_MODEL_DIR, model.__class__.__name__)
     create_folder(model_path)
     model.save_weights(os.path.join(model_path, "model"))
+
+def save_metrics(metrics,name):
+    """Save metrics to disk"""
+    path = os.path.join(SAVED_MODEL_DIR, name)
+    pickle.dump(metrics,open(os.path.join(path,'metrics.pkl'),'wb'))
 
 def create_vocab(file_path: str, vocab_size: int) -> typing.Dict[str, np.ndarray]:
     """Returns a dictionary that maps words to one hot embeddings"""
@@ -35,10 +46,11 @@ def create_vocab(file_path: str, vocab_size: int) -> typing.Dict[str, np.ndarray
     # Get unique words
     unique_words, word_counts = np.unique(words, return_counts=True)
     sorted_unique_words = unique_words[np.argsort(word_counts)[::-1]]
-
     if vocab_size is None: 
         vocab_size = len(sorted_unique_words)
-    assert vocab_size <= len(sorted_unique_words), "vocab_size is too big."
+    if vocab_size > len(sorted_unique_words):
+        vocab_size = len(sorted_unique_words)
+        logger.info(f"vocab_size is too big. Using vocab_size = {vocab_size} ")
     
     # Build vocabulary
     word2idx = {word:i+1 for i, word in enumerate(sorted_unique_words[:vocab_size])}
@@ -63,9 +75,12 @@ def get_sentences(file_path: str) -> typing.List[typing.List[str]]:
         
     return sentences
 
-def sort(x,y):
+def sort(x,y=None):
     """ Sort data according to len when using dynamic seq_len for efficient batching."""
     idx = np.argsort([len(ip) for ip in x])
+    #pdb.set_trace()
+    if y == None:
+        return x[idx]
     return x[idx], y[idx]
 
 
