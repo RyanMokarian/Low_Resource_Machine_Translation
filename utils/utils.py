@@ -78,7 +78,6 @@ def get_sentences(file_path: str) -> typing.List[typing.List[str]]:
 def sort(x,y=None):
     """ Sort data according to len when using dynamic seq_len for efficient batching."""
     idx = np.argsort([len(ip) for ip in x])
-    #pdb.set_trace()
     if y == None:
         return x[idx]
     return x[idx], y[idx]
