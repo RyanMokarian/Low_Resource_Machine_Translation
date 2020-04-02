@@ -19,6 +19,7 @@ from train import cross_entropy, loss_function, train_accuracy_metric, valid_acc
 
 SEED = 1
 
+logging.initializeLogger()
 logger = logging.getLogger()
 
 train_loss_metric = metrics.Perplexity()

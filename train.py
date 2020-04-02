@@ -15,6 +15,7 @@ from utils import metrics
 
 SEED = 1
 
+logging.initializeLogger()
 logger = logging.getLogger()
 
 # Metrics
@@ -42,10 +43,10 @@ def train_epoch(model, data_loader, optimizer, batch_nb, idx2word_fr):
     for batch in tqdm(data_loader, total=batch_nb, desc='train epoch', leave=False):
         labels = batch['labels']
         batch['gen_seq_len'] = labels.shape[1]
-        mask = tf.math.logical_not(tf.math.equal(labels, 0))
         with tf.GradientTape() as tape:
             preds = model(batch, training=True)
             labels, preds = labels[:, 1:], preds[:, 1:]  # Ignore BOS token
+            mask = tf.math.logical_not(tf.math.equal(labels, 0))
             loss = loss_function(y_true=labels, y_pred=preds, mask=mask)
 
         grads = tape.gradient(loss, model.trainable_variables)
@@ -63,10 +64,10 @@ def test_epoch(model, data_loader, batch_nb, idx2word_fr, idx2word_en):
     for batch in tqdm(data_loader, total=batch_nb, desc='valid epoch', leave=False):
         labels = batch['labels']
         batch['gen_seq_len'] = labels.shape[1]
-        mask = tf.math.logical_not(tf.math.equal(labels, 0))
 
         preds = model(batch)
         labels, preds = labels[:, 1:], preds[:, 1:]  # Ignore BOS token
+        mask = tf.math.logical_not(tf.math.equal(labels, 0))
         loss = loss_function(y_true=labels, y_pred=preds, mask=mask)
 
         valid_accuracy_metric.update_state(y_true=labels, y_pred=preds, sample_weight=mask)
