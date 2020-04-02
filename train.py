@@ -72,6 +72,7 @@ def test_epoch(model, data_loader, batch_nb, idx2word_fr, idx2word_en):
         valid_accuracy_metric.update_state(y_true=labels, y_pred=preds)
         valid_loss_metric.update_state(y_true=labels, y_pred=preds)
         valid_bleu_metric.update_state(y_true=labels, y_pred=preds, vocab=idx2word_fr)
+
     idx = np.random.choice(range(10))
     label_sentence = utils.generate_sentence(batch['inputs'][idx].numpy(), idx2word_fr)
     pred_sentence = utils.generate_sentence(np.argmax(preds[idx].numpy(), axis=1).astype('int'), idx2word_fr)
@@ -89,6 +90,7 @@ def main(
     vocab_size: int = None,  # If None all tokens of will be in vocab
     seq_len: int = None,  # If None the seq len is dynamic (might not work with all models)
     seed: bool = True):
+
     # Call to remove tensorflow warning about casting float64 to float32
     tf.keras.backend.set_floatx('float32')
 
@@ -124,10 +126,10 @@ def main(
     elif model == 'seq2seqgru':
         model = Seq2SeqGRU(len(word2idx_en),
                            word2idx_fr,
-                           embedding_dim=128,
-                           encoder_units=256,
-                           decoder_units=256,
-                           attention_units=10)
+                           batch_size,
+                           embedding_dim=256,
+                           encoder_units=512,
+                           decoder_units=512)
     else:
         raise Exception(f'Model "{model}" not recognized.')
 

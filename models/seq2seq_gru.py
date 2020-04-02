@@ -6,16 +6,15 @@ import tensorflow as tf
 
 
 class Seq2SeqGRU(tf.keras.Model):
-    def __init__(self, vocab_size_en, vocab_fr, embedding_dim, encoder_units, decoder_units, attention_units):
+    def __init__(self, vocab_size_en, vocab_fr, batch_size, embedding_dim, encoder_units, decoder_units):
         super(Seq2SeqGRU, self).__init__()
         self.vocab_size_en = vocab_size_en
         self.vocab_fr = vocab_fr
         self.embedding_dim = embedding_dim
         self.encoder_units = encoder_units
         self.decoder_units = decoder_units
-        self.attention_units = attention_units
         self.encoder = Encoder(self.vocab_size_en, self.embedding_dim, self.encoder_units)
-        self.decoder = Decoder(len(self.vocab_fr), self.embedding_dim, self.decoder_units, self.attention_units)
+        self.decoder = Decoder(len(self.vocab_fr), self.embedding_dim, self.decoder_units)
 
     def call(self, batch, training=False):
         # Unpack inputs
@@ -75,7 +74,7 @@ class Encoder(tf.keras.Model):
 
 
 class Decoder(tf.keras.Model):
-    def __init__(self, vocab_size, embedding_dim, decoder_units, attention_units):
+    def __init__(self, vocab_size, embedding_dim, decoder_units):
         super(Decoder, self).__init__()
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
         self.gru = tf.keras.layers.GRU(decoder_units,
@@ -85,7 +84,7 @@ class Decoder(tf.keras.Model):
         self.fc = tf.keras.layers.Dense(vocab_size)
 
         # used for attention
-        self.attention = Attention(attention_units)
+        self.attention = Attention(decoder_units)
 
     def call(self, x, hidden, enc_output, init_state):
         # enc_output shape == (batch_size, max_length, hidden_size)
