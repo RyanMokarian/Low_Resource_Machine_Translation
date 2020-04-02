@@ -75,9 +75,9 @@ def test_epoch(model, data_loader, batch_nb, idx2word_fr, idx2word_en):
         valid_bleu_metric.update_state(y_true=labels, y_pred=preds, vocab=idx2word_fr)
 
     idx = np.random.choice(range(10))
-    label_sentence = utils.generate_sentence(batch['inputs'][idx].numpy(), idx2word_fr)
+    label_sentence = utils.generate_sentence(labels[idx].numpy(), idx2word_fr)
     pred_sentence = utils.generate_sentence(np.argmax(preds[idx].numpy(), axis=1).astype('int'), idx2word_fr)
-    source_sentence = utils.generate_sentence(labels[0].numpy().astype('int'), idx2word_en)
+    source_sentence = utils.generate_sentence(batch['inputs'][idx].numpy().astype('int'), idx2word_en)
     logger.debug(f'Sample : \n    Source : {source_sentence}\n    Pred : {pred_sentence}\n    Label : {label_sentence}')
 
 

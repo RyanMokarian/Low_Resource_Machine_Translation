@@ -52,7 +52,6 @@ class Seq2SeqGRU(tf.keras.Model):
         name += f'_embedding-dim_{self.embedding_dim}'
         name += f'_encoder-units_{self.encoder_units}'
         name += f'_decoder-units_{self.decoder_units}'
-        name += f'_attention-units_{self.decoder_units}'
         return name
 
 
