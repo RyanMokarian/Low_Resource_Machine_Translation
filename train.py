@@ -32,7 +32,8 @@ def loss_function(y_true, y_pred, mask):
     loss_ = cross_entropy(y_true, y_pred)
     mask = tf.cast(mask, dtype=loss_.dtype)
     loss_ *= mask
-    loss_ = tf.reduce_sum(loss_) / tf.reduce_sum(mask)  # prevent taking average over padding positions as well
+    loss_ = tf.reduce_mean(
+        loss_)  #tf.reduce_sum(loss_) / tf.reduce_sum(mask)  # prevent taking average over padding positions as well
     return loss_
 
 
@@ -74,7 +75,7 @@ def test_epoch(model, data_loader, batch_nb, idx2word_fr, idx2word_en):
         valid_loss_metric.update_state(y_true=labels, y_pred=preds, sample_weight=mask)
         valid_bleu_metric.update_state(y_true=labels, y_pred=preds, vocab=idx2word_fr)
 
-    idx = np.random.choice(range(10))
+    idx = 0
     label_sentence = utils.generate_sentence(labels[idx].numpy(), idx2word_fr)
     pred_sentence = utils.generate_sentence(np.argmax(preds[idx].numpy(), axis=1).astype('int'), idx2word_fr)
     source_sentence = utils.generate_sentence(batch['inputs'][idx].numpy().astype('int'), idx2word_en)
@@ -90,7 +91,10 @@ def main(
     batch_size: int = 32,
     vocab_size: int = None,  # If None all tokens of will be in vocab
     seq_len: int = None,  # If None the seq len is dynamic (might not work with all models)
-    seed: bool = True):
+    seed: bool = True,
+    model_config: dict = None):
+
+    print(f'model_config : {model_config}')
 
     # Call to remove tensorflow warning about casting float64 to float32
     tf.keras.backend.set_floatx('float32')
@@ -125,12 +129,15 @@ def main(
     if model == 'gru':
         model = baselines.GRU(len(word2idx_fr), batch_size)
     elif model == 'seq2seqgru':
-        model = Seq2SeqGRU(len(word2idx_en),
-                           word2idx_fr,
-                           batch_size,
-                           embedding_dim=256,
-                           encoder_units=512,
-                           decoder_units=512)
+        if model_config:
+            model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, model_config)
+        else:
+            model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, {
+                'embedding_dim': 128,
+                'encoder_units': 256,
+                'decoder_units': 256,
+                'n_layers': 1
+            })
     else:
         raise Exception(f'Model "{model}" not recognized.')
 

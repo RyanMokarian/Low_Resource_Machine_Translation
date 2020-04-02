@@ -6,15 +6,16 @@ import tensorflow as tf
 
 
 class Seq2SeqGRU(tf.keras.Model):
-    def __init__(self, vocab_size_en, vocab_fr, batch_size, embedding_dim, encoder_units, decoder_units):
+    def __init__(self, vocab_size_en, vocab_fr, batch_size, config):
         super(Seq2SeqGRU, self).__init__()
         self.vocab_size_en = vocab_size_en
         self.vocab_fr = vocab_fr
-        self.embedding_dim = embedding_dim
-        self.encoder_units = encoder_units
-        self.decoder_units = decoder_units
-        self.encoder = Encoder(self.vocab_size_en, self.embedding_dim, self.encoder_units)
-        self.decoder = Decoder(len(self.vocab_fr), self.embedding_dim, self.decoder_units)
+        self.embedding_dim = config['embedding_dim']
+        self.encoder_units = config['encoder_units']
+        self.decoder_units = config['decoder_units']
+        self.n_layers = config['n_layers']
+        self.encoder = Encoder(self.vocab_size_en, self.embedding_dim, self.encoder_units, self.n_layers)
+        self.decoder = Decoder(len(self.vocab_fr), self.embedding_dim, self.decoder_units, self.n_layers)
 
     def call(self, batch, training=False):
         # Unpack inputs
@@ -52,34 +53,40 @@ class Seq2SeqGRU(tf.keras.Model):
         name += f'_embedding-dim_{self.embedding_dim}'
         name += f'_encoder-units_{self.encoder_units}'
         name += f'_decoder-units_{self.decoder_units}'
+        name += f'_n-layers_{self.n_layers}'
         return name
 
 
 class Encoder(tf.keras.Model):
-    def __init__(self, vocab_size, embedding_dim, units):
+    def __init__(self, vocab_size, embedding_dim, encoder_units, n_layers):
         super(Encoder, self).__init__()
-        self.units = units
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-        self.gru = tf.keras.layers.GRU(self.units,
-                                       return_sequences=True,
-                                       return_state=True,
-                                       recurrent_initializer='glorot_uniform')
+        self.grus = [
+            tf.keras.layers.GRU(encoder_units,
+                                return_sequences=True,
+                                return_state=True,
+                                recurrent_initializer='glorot_uniform') for i in range(n_layers)
+        ]
 
     def call(self, x):
         x = self.embedding(x)
         # None initalizes with zeros and takes care of batch_size
-        output, state = self.gru(x, initial_state=None)
-        return output, state
+        for gru in self.grus:
+            x, state = gru(x)
+        # output, state = self.gru(x, initial_state=None)
+        return x, state
 
 
 class Decoder(tf.keras.Model):
-    def __init__(self, vocab_size, embedding_dim, decoder_units):
+    def __init__(self, vocab_size, embedding_dim, decoder_units, n_layers):
         super(Decoder, self).__init__()
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-        self.gru = tf.keras.layers.GRU(decoder_units,
-                                       return_sequences=True,
-                                       return_state=True,
-                                       recurrent_initializer='glorot_uniform')
+        self.grus = [
+            tf.keras.layers.GRU(decoder_units,
+                                return_sequences=True,
+                                return_state=True,
+                                recurrent_initializer='glorot_uniform') for i in range(n_layers)
+        ]
         self.fc = tf.keras.layers.Dense(vocab_size)
 
         # used for attention
@@ -97,10 +104,11 @@ class Decoder(tf.keras.Model):
 
         # passing the concatenated vector to the GRU
         # let the decoder carry it's hidden state, change to None if not required
-        output, state = self.gru(x, initial_state=init_state)
+        for gru in self.grus:
+            x, state = gru(x, initial_state=None)
 
         # output shape == (batch_size * 1, hidden_size)
-        output = tf.reshape(output, (-1, output.shape[2]))
+        output = tf.reshape(x, (-1, x.shape[2]))
 
         # output shape == (batch_size, vocab)
         x = self.fc(output)
