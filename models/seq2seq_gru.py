@@ -25,11 +25,12 @@ class Seq2SeqGRU(tf.keras.Model):
 
         decoder_hidden = encoder_hidden
         # self.vocab_fr['<start>']]
-        decoder_input = tf.expand_dims([self.vocab_fr['<start>']]] * self.batch_size, 1)
+        decoder_input = tf.expand_dims([self.vocab_fr['<start>']] *
+                                       self.batch_size, 1)
 
         predicted_seq = []
         predicted_seq.append(
-            tf.one_hot([self.vocab_fr['<start>']]] * self.batch_size,
+            tf.one_hot([self.vocab_fr['<start>']] * self.batch_size,
                        len(self.vocab_fr)))  # <start> is the first prediction
         for t in range(1, gen_seq_len):
             predictions, decoder_hidden, _ = self.decoder(

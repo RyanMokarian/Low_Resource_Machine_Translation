@@ -104,7 +104,7 @@ def main(
     epochs: int = 30,
     optimizer: str = 'adam',
     lr: float = 1e-3,
-    batch_size: int = 64,
+    batch_size: int = 32,
     vocab_size: int = None,  # If None all tokens of will be in vocab
     seq_len:
     int = None,  # If None the seq len is dynamic (might not work with all models)
@@ -162,8 +162,8 @@ def main(
                            word2idx_fr,
                            batch_size,
                            embedding_dim=256,
-                           encoder_units=256,
-                           decoder_units=256)
+                           encoder_units=512,
+                           decoder_units=512)
     else:
         raise Exception(f'Model "{model}" not recognized.')
 
