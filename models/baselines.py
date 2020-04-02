@@ -6,12 +6,8 @@ class GRU(tf.keras.Model):
     def __init__(self, vocab_size, batch_size, rnn_units=3, embedding_dim=256):
         super(GRU, self).__init__()
         self.model = tf.keras.Sequential([
-            tf.keras.layers.Embedding(vocab_size,
-                                      embedding_dim,
-                                      batch_input_shape=[batch_size, None]),
-            tf.keras.layers.GRU(rnn_units,
-                                return_sequences=True,
-                                stateful=True,
+            tf.keras.layers.Embedding(vocab_size, embedding_dim, batch_input_shape=[batch_size, None]),
+            tf.keras.layers.GRU(rnn_units, return_sequences=True, stateful=True,
                                 recurrent_initializer='glorot_uniform'),
             tf.keras.layers.Dense(vocab_size, activation=tf.nn.log_softmax)
         ])
@@ -36,11 +32,7 @@ class LSTM(tf.keras.Model):
 
 class RecurrentNet(tf.keras.Model):
     """Multi-Layer LSTM OR GRU Model with a generate function for language modeling"""
-    def __init__(self,
-                 vocab_size,
-                 embed_dims=256,
-                 rnn_type='gru',
-                 num_layers=1):
+    def __init__(self, vocab_size, embed_dims=256, rnn_type='gru', num_layers=1):
         super().__init__()
         self.vocab_size = vocab_size
         self.embed_dims = embed_dims
@@ -50,15 +42,9 @@ class RecurrentNet(tf.keras.Model):
         self.rnns = []
         for i in range(num_layers):
             if self.rnn_type == 'lstm':
-                self.rnns.append(
-                    layers.LSTM(embed_dims,
-                                return_state=True,
-                                return_sequences=True))
+                self.rnns.append(layers.LSTM(embed_dims, return_state=True, return_sequences=True))
             else:
-                self.rnns.append(
-                    layers.GRU(embed_dims,
-                               return_state=True,
-                               return_sequences=True))
+                self.rnns.append(layers.GRU(embed_dims, return_state=True, return_sequences=True))
 
         self.fc2 = layers.Dense(vocab_size)
 
@@ -79,14 +65,10 @@ class RecurrentNet(tf.keras.Model):
             x = self.fc1(x)
             for i in range(self.num_layers):
                 if self.rnn_type == 'lstm':
-                    x, h, c = self.rnns[i](x,
-                                           initial_state=state[i],
-                                           training=False)
+                    x, h, c = self.rnns[i](x, initial_state=state[i], training=False)
                     new_state.append([h, c])
                 else:
-                    x, h = self.rnns[i](x,
-                                        initial_state=state[i],
-                                        training=False)
+                    x, h = self.rnns[i](x, initial_state=state[i], training=False)
                     new_state.append(h)
             x = self.fc2(x)
             # taking argmax gets stuck in a loop, hence sample from this distribution
@@ -96,6 +78,6 @@ class RecurrentNet(tf.keras.Model):
             state = new_state
         return outputs, new_state
 
-    def get_name():
+    def get_name(self):
         # TODO : Add Model parameters to the name so that the model name is unique.
-        return model.__class__.__name__
+        return self.__class__.__name__
