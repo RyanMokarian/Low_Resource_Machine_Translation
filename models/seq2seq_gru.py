@@ -88,7 +88,7 @@ class Decoder(tf.keras.Model):
     def call(self, x, hidden, enc_output, init_state):
         # enc_output shape == (batch_size, max_length, hidden_size)
         context_vector, attention_weights = self.attention(hidden, enc_output)
-        #pdb.set_trace()
+
         # x shape after passing through embedding == (batch_size, 1, embedding_dim)
         x = self.embedding(x)
 

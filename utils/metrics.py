@@ -2,7 +2,7 @@
 import sacrebleu
 import numpy as np
 import tensorflow as tf
-import tensorflow.keras.backend as K  # Alias to Keras' backend namespace.
+import tensorflow.keras.backend as K
 
 from utils import utils
 
@@ -34,7 +34,7 @@ class Perplexity():
       self.total_loss = 0
       self.total_num_examples = 0
   
-  def calculate_loss(self,real,pred):
+  def calculate_loss(self, real, pred): 
       mask = tf.math.logical_not(tf.math.equal(real, 0))
       loss_ = self.cross_entropy(real, pred)
       mask = tf.cast(mask, dtype=loss_.dtype)
@@ -42,9 +42,8 @@ class Perplexity():
       self.total_loss += K.sum(loss_)
       self.total_num_examples += K.sum(mask)
 
-  
-  def update_state(self,y_true,y_pred):
-      self.calculate_loss(y_true,y_pred)
+  def update_state(self, y_true, y_pred):
+      self.calculate_loss(y_true, y_pred)
 
   def result(self):
       return K.exp(self.total_loss/self.total_num_examples)
