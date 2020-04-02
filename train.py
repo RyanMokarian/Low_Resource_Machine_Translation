@@ -67,10 +67,11 @@ def test_epoch(model, data_loader, batch_nb, idx2word_fr, idx2word_en):
 
         preds = model(batch)
         labels, preds = labels[:, 1:], preds[:, 1:]  # Ignore BOS token
-        loss = loss_function(y_true=labels, y_pred=preds)
+        mask = tf.math.logical_not(tf.math.equal(labels, 0))
+        loss = loss_function(y_true=labels, y_pred=preds, mask=mask)
 
-        valid_accuracy_metric.update_state(y_true=labels, y_pred=preds)
-        valid_loss_metric.update_state(y_true=labels, y_pred=preds)
+        valid_accuracy_metric.update_state(y_true=labels, y_pred=preds, sample_weight=mask)
+        valid_loss_metric.update_state(y_true=labels, y_pred=preds, sample_weight=mask)
         valid_bleu_metric.update_state(y_true=labels, y_pred=preds, vocab=idx2word_fr)
 
     idx = np.random.choice(range(10))
