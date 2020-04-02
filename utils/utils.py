@@ -1,7 +1,6 @@
 import os
 import typing
 import pickle
-import pdb
 
 import numpy as np
 import tensorflow as tf
@@ -13,7 +12,7 @@ logger = logging.getLogger()
 
 PADDING_TOKEN = '<pad>'
 UNKNOWN_TOKEN = '<unk>'
-SAVED_MODEL_DIR = '../saved_model'
+SAVED_MODEL_DIR = 'saved_model'
 
 def create_folder(path: str):
     """ This function creates a folder if it does not already exists."""
@@ -24,7 +23,7 @@ def save_model(model: tf.keras.Model, name = None):
     """ This function saves the model to disk."""
     create_folder(SAVED_MODEL_DIR)
     if name: model_path = os.path.join(SAVED_MODEL_DIR, name) 
-    else: model_path = os.path.join(SAVED_MODEL_DIR, model.__class__.__name__)
+    else: model_path = os.path.join(SAVED_MODEL_DIR, model.get_name())
     create_folder(model_path)
     model.save_weights(os.path.join(model_path, "model"))
 
