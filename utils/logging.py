@@ -6,8 +6,10 @@ LOG_FILENAME = 'logs.txt'
 # Remove useless warning. This is updated in latest tensorflow version.
 logging.root.removeHandler(absl.logging._absl_handler) # https://github.com/abseil/abseil-py/issues/99
 absl.logging._warn_preinit_stderr = False # https://github.com/abseil/abseil-py/issues/102
- 
-def getLogger():
+
+loaded = False
+
+def initializeLogger():
     # Get logger
     logger = logging.getLogger('logger')
     logger.setLevel(logging.DEBUG)
@@ -28,4 +30,6 @@ def getLogger():
     # Add handler
     logger.addHandler(stream_handler)
     logger.addHandler(file_handler)
-    return logger
+ 
+def getLogger():
+    return logging.getLogger('logger')

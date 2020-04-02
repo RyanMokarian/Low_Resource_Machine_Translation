@@ -1,4 +1,5 @@
 # User defined things to ignore
+.vscode/
 .idea
 logs.txt
 saved_model/
