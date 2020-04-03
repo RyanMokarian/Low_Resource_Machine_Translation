@@ -85,16 +85,14 @@ def test_epoch(model, data_loader, batch_nb, idx2word_fr, idx2word_en):
 def main(
     data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
     model: str = 'seq2seqgru',
-    epochs: int = 10,
+    epochs: int = 20,
     optimizer: str = 'adam',
-    lr: float = 1e-4,
+    lr: float = 1e-3,
     batch_size: int = 32,
     vocab_size: int = None,  # If None all tokens of will be in vocab
     seq_len: int = None,  # If None the seq len is dynamic (might not work with all models)
     seed: bool = True,
     model_config: dict = None):
-
-    print(f'model_config : {model_config}')
 
     # Call to remove tensorflow warning about casting float64 to float32
     tf.keras.backend.set_floatx('float32')

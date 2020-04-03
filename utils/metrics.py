@@ -16,7 +16,7 @@ class BleuScore():
         for i in range(len(y_true)):
             label_sentence = utils.generate_sentence(y_true[i].numpy().astype('int'), vocab)
             pred_sentence = utils.generate_sentence(np.argmax(y_pred[i].numpy(), axis=1).astype('int'), vocab)
-            self.total_score += sacrebleu.sentence_bleu(pred_sentence, label_sentence).score
+            self.total_score += sacrebleu.corpus_bleu(pred_sentence, label_sentence).score
             self.total_num_examples += 1
 
     def result(self):
