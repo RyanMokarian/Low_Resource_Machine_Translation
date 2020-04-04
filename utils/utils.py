@@ -27,10 +27,10 @@ def save_model(model: tf.keras.Model, name = None):
     create_folder(model_path)
     model.save_weights(os.path.join(model_path, "model"))
 
-def save_metrics(metrics,name):
+def save_metrics(metrics, name):
     """Save metrics to disk"""
     path = os.path.join(SAVED_MODEL_DIR, name)
-    pickle.dump(metrics,open(os.path.join(path,'metrics.pkl'),'wb'))
+    pickle.dump(metrics, open(os.path.join(path, 'metrics.pkl'), 'wb'))
 
 def create_vocab(file_path: str, vocab_size: int) -> typing.Dict[str, np.ndarray]:
     """Returns a dictionary that maps words to one hot embeddings"""

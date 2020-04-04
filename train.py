@@ -178,7 +178,7 @@ def main(
         metrics['valid_bleu'].append(valid_bleu)
 
     # save metrics
-    utils.save_metrics(metrics)
+    utils.save_metrics(metrics, model.get_name())
     # Plot losses
     plots.plot_accuracy(metrics['train_accuracy'], metrics['valid_accuracy'])
 
