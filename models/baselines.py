@@ -51,7 +51,7 @@ class RecurrentNet(tf.keras.Model):
     def call(self, x, training=False):
         x = self.fc1(x)
         for i in range(self.num_layers):
-            x = self.rnns[i](x, training=False)[0]
+            x = self.rnns[i](x, training=training)[0]
         x = self.fc2(x)
         return x
 
