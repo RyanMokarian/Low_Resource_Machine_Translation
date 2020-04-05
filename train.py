@@ -92,7 +92,8 @@ def main(
     vocab_size: int = None,  # If None all tokens of will be in vocab
     seq_len: int = None,  # If None the seq len is dynamic (might not work with all models)
     seed: bool = True,
-    model_config: dict = None):
+    model_config: dict = None,
+    embedding: str = None):
 
     # Call to remove tensorflow warning about casting float64 to float32
     tf.keras.backend.set_floatx('float32')
@@ -123,6 +124,11 @@ def main(
     train_dataset, valid_dataset, nb_train_ex, nb_valid_ex = utils.load_training_data(
         path_en, path_fr, word2idx_en, word2idx_fr, seq_len, batch_size)
     logger.info(f'Number of training examples : {nb_train_ex}, number of valid examples : {nb_valid_ex}')
+
+    # Load embeddings
+    if embedding == 'fasttext':
+        word2vec = utils.create_fasttext_embedding(path_unaligned_en, vocab_size)
+
     # Create model
     if model == 'gru':
         model = baselines.GRU(len(word2idx_fr), batch_size)
