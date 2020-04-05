@@ -111,10 +111,13 @@ def main(
     else:
         raise Exception(f'Optimizer "{optimizer}" not recognized.')
 
-    # Create vocabs
-    logger.info('Creating vocab...')
+    # Data paths
     path_en = os.path.join(data_dir, 'train.lang1')
     path_fr = os.path.join(data_dir, 'train.lang2')
+    path_unaligned_en = os.path.join(data_dir, 'unaligned.en')
+
+    # Create vocabs
+    logger.info('Creating vocab...')
     word2idx_en, idx2word_en = utils.create_vocab(path_en, vocab_size)
     word2idx_fr, idx2word_fr = utils.create_vocab(path_fr, vocab_size)
     logger.info(f'Size of english vocab : {len(word2idx_en)}, size of french vocab : {len(word2idx_fr)}')
@@ -126,22 +129,33 @@ def main(
     logger.info(f'Number of training examples : {nb_train_ex}, number of valid examples : {nb_valid_ex}')
 
     # Load embeddings
-    if embedding == 'fasttext':
-        word2vec = utils.create_fasttext_embedding(path_unaligned_en, vocab_size)
+    if embedding:
+        logger.info(f'Loading embedding {embedding} ...')
+        if embedding == 'fasttext':
+            embedding = utils.create_fasttext_embedding_matrix(path_unaligned_en, word2idx_en)
+        elif embedding == 'word2vec':
+            raise Exception(f'Embedding "{embedding}" not implemented yet')
+        elif embedding == 'glove':
+            raise Exception(f'Embedding "{embedding}" not implemented yet')
+        else:
+            raise Exception(f'Embedding "{embedding}" not recognized.')
 
     # Create model
     if model == 'gru':
         model = baselines.GRU(len(word2idx_fr), batch_size)
     elif model == 'seq2seqgru':
         if model_config:
-            model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, model_config)
+            model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, model_config, embedding_matrix=embedding)
         else:
-            model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, {
-                'embedding_dim': 128,
-                'encoder_units': 256,
-                'decoder_units': 256,
-                'n_layers': 1
-            })
+            model = Seq2SeqGRU(len(word2idx_en),
+                               word2idx_fr,
+                               batch_size, {
+                                   'embedding_dim': 256,
+                                   'encoder_units': 512,
+                                   'decoder_units': 512,
+                                   'n_layers': 1
+                               },
+                               embedding_matrix=embedding)
     else:
         raise Exception(f'Model "{model}" not recognized.')
 

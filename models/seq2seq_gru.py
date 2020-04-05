@@ -12,7 +12,7 @@ class Seq2SeqGRU(tf.keras.Model):
         self.vocab_fr = vocab_fr
 
         # FIXME : We should always take the the embedding_dim of the config.
-        if embedding_matrix: 
+        if embedding_matrix is not None:
             self.embedding_dim = embedding_matrix.shape[1]
         else:
             self.embedding_dim = config['embedding_dim']
@@ -67,7 +67,13 @@ class Seq2SeqGRU(tf.keras.Model):
 class Encoder(tf.keras.Model):
     def __init__(self, vocab_size, embedding_dim, encoder_units, n_layers, embedding_matrix):
         super(Encoder, self).__init__()
-        self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim, weigths=[embedding_matrix])
+        if embedding_matrix is not None:
+            self.embedding = tf.keras.layers.Embedding(vocab_size,
+                                                       embedding_dim,
+                                                       weights=[embedding_matrix],
+                                                       trainable=False)
+        else:
+            self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
         self.grus = [
             tf.keras.layers.GRU(encoder_units,
                                 return_sequences=True,

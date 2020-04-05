@@ -2,6 +2,7 @@ import os
 import typing
 import pickle
 
+import fasttext
 import numpy as np
 import tensorflow as tf
 
@@ -13,6 +14,7 @@ logger = logging.getLogger()
 PADDING_TOKEN = '<pad>'
 UNKNOWN_TOKEN = '<unk>'
 SAVED_MODEL_DIR = 'saved_model'
+SHARED_PATH = '../data'
 
 def create_folder(path: str):
     """ This function creates a folder if it does not already exists."""
@@ -22,8 +24,10 @@ def create_folder(path: str):
 def save_model(model: tf.keras.Model, name = None):
     """ This function saves the model to disk."""
     create_folder(SAVED_MODEL_DIR)
-    if name: model_path = os.path.join(SAVED_MODEL_DIR, name) 
-    else: model_path = os.path.join(SAVED_MODEL_DIR, model.get_name())
+    if name: 
+        model_path = os.path.join(SAVED_MODEL_DIR, name) 
+    else: 
+        model_path = os.path.join(SAVED_MODEL_DIR, model.get_name())
     create_folder(model_path)
     model.save_weights(os.path.join(model_path, "model"))
 
@@ -32,7 +36,7 @@ def save_metrics(metrics, name):
     path = os.path.join(SAVED_MODEL_DIR, name)
     pickle.dump(metrics, open(os.path.join(path, 'metrics.pkl'), 'wb'))
 
-def create_fasttext_embedding(file_path: str, vocab: typing.Dict[str, int]) -> typing.Dict[str, np.ndarray]:
+def create_fasttext_embedding_matrix(file_path: str, vocab: typing.Dict[str, int]) -> typing.Dict[str, np.ndarray]:
     """Train a fasttext model and return the embeddings."""
     
     model_path = os.path.join(SHARED_PATH, 'embedding_models', 'fasttext_model.bin')
@@ -45,8 +49,15 @@ def create_fasttext_embedding(file_path: str, vocab: typing.Dict[str, int]) -> t
         model = fasttext.train_unsupervised(file_path, model='skipgram')
         model.save_model(model_path)
 
-    idx2vec = {vocab[word]:model[word] for word in vocab.keys()}
-    return idx2vec
+    embedding_matrix = np.zeros((len(vocab), model.get_dimension()))
+    for word in vocab.keys():
+        idx = vocab[word]
+        if word in model.words:
+            embedding_matrix[idx] = model[word]
+        else:
+            pass # If word embedding is unknown, vector of zeros
+
+    return embedding_matrix
 
 def create_vocab(file_path: str, vocab_size: int) -> typing.Dict[str, np.ndarray]:
     """Returns a dictionary that maps words to one hot embeddings"""
