@@ -14,7 +14,7 @@ logger = logging.getLogger()
 PADDING_TOKEN = '<pad>'
 UNKNOWN_TOKEN = '<unk>'
 SAVED_MODEL_DIR = 'saved_model'
-SHARED_PATH = '../data'
+SHARED_PATH = '/project/cq-training-1/project2/teams/team12/'
 
 def create_folder(path: str):
     """ This function creates a folder if it does not already exists."""
@@ -167,9 +167,10 @@ def generate_sentence(indices: typing.List[int], vocab: typing.Dict[int, str]):
             print(f'idx {idx} not in vocab')
             continue
         elif vocab[idx] == PADDING_TOKEN \
-            or vocab[idx] == text_preprocessing.BOS \
-            or vocab[idx] == text_preprocessing.EOS:
+            or vocab[idx] == text_preprocessing.BOS:
             continue
+        elif vocab[idx] == text_preprocessing.EOS:
+            break
 
         sentence += vocab[int(idx)]
         sentence += ' '

@@ -11,7 +11,7 @@ class Seq2SeqGRU(tf.keras.Model):
         self.vocab_size_en = vocab_size_en
         self.vocab_fr = vocab_fr
 
-        # FIXME : We should always take the the embedding_dim of the config.
+        # FIXME : We should probably create the embedding matrix depending of the config so we don't have to do this
         if embedding_matrix is not None:
             self.embedding_dim = embedding_matrix.shape[1]
         else:
