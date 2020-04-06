@@ -105,6 +105,12 @@ def main(
         optimizer = tf.keras.optimizers.Adam(lr)
     elif optimizer == 'sgd':
         optimizer = tf.keras.optimizers.SGD(lr)
+    elif model == 'transformer':
+        num_layers = 4
+        d_model = 128
+        dff = 512
+        num_heads = 8
+        model = transformer.Transformer(num_layers, d_model, num_heads, dff, len(word2idx_en), len(word2idx_fr), len(word2idx_en), len(word2idx_fr))    
     else:
         raise Exception(f'Optimizer "{optimizer}" not recognized.')
 
