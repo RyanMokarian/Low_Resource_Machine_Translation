@@ -6,15 +6,22 @@ import tensorflow as tf
 
 
 class Seq2SeqGRU(tf.keras.Model):
-    def __init__(self, vocab_size_en, vocab_fr, batch_size, config):
+    def __init__(self, vocab_size_en, vocab_fr, batch_size, config, embedding_matrix=None):
         super(Seq2SeqGRU, self).__init__()
         self.vocab_size_en = vocab_size_en
         self.vocab_fr = vocab_fr
-        self.embedding_dim = config['embedding_dim']
+
+        # FIXME : We should probably create the embedding matrix depending of the config so we don't have to do this
+        if embedding_matrix is not None:
+            self.embedding_dim = embedding_matrix.shape[1]
+        else:
+            self.embedding_dim = config['embedding_dim']
+
         self.encoder_units = config['encoder_units']
         self.decoder_units = config['decoder_units']
         self.n_layers = config['n_layers']
-        self.encoder = Encoder(self.vocab_size_en, self.embedding_dim, self.encoder_units, self.n_layers)
+        self.encoder = Encoder(self.vocab_size_en, self.embedding_dim, self.encoder_units, self.n_layers,
+                               embedding_matrix)
         self.decoder = Decoder(len(self.vocab_fr), self.embedding_dim, self.decoder_units, self.n_layers)
 
     def call(self, batch, training=False):
@@ -58,9 +65,15 @@ class Seq2SeqGRU(tf.keras.Model):
 
 
 class Encoder(tf.keras.Model):
-    def __init__(self, vocab_size, embedding_dim, encoder_units, n_layers):
+    def __init__(self, vocab_size, embedding_dim, encoder_units, n_layers, embedding_matrix):
         super(Encoder, self).__init__()
-        self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
+        if embedding_matrix is not None:
+            self.embedding = tf.keras.layers.Embedding(vocab_size,
+                                                       embedding_dim,
+                                                       weights=[embedding_matrix],
+                                                       trainable=False)
+        else:
+            self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
         self.grus = [
             tf.keras.layers.GRU(encoder_units,
                                 return_sequences=True,
