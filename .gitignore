@@ -1,4 +1,5 @@
 # User defined things to ignore
+*.out
 .vscode/
 .idea
 logs.txt
