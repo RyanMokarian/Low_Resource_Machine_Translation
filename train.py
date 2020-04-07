@@ -32,7 +32,8 @@ def loss_function(y_true, y_pred, mask):
     loss_ = cross_entropy(y_true, y_pred)
     mask = tf.cast(mask, dtype=loss_.dtype)
     loss_ *= mask
-    loss_ = tf.reduce_sum(loss_) / tf.reduce_sum(mask)  # prevent taking average over padding positions as well
+    loss_ = tf.reduce_mean(
+        loss_)  #tf.reduce_sum(loss_) / tf.reduce_sum(mask)  # prevent taking average over padding positions as well
     return loss_
 
 
@@ -74,7 +75,7 @@ def test_epoch(model, data_loader, batch_nb, idx2word_fr, idx2word_en):
         valid_loss_metric.update_state(y_true=labels, y_pred=preds, sample_weight=mask)
         valid_bleu_metric.update_state(y_true=labels, y_pred=preds, vocab=idx2word_fr)
 
-    idx = np.random.choice(range(10))
+    idx = 0
     label_sentence = utils.generate_sentence(labels[idx].numpy(), idx2word_fr)
     pred_sentence = utils.generate_sentence(np.argmax(preds[idx].numpy(), axis=1).astype('int'), idx2word_fr)
     source_sentence = utils.generate_sentence(batch['inputs'][idx].numpy().astype('int'), idx2word_en)
@@ -84,13 +85,15 @@ def test_epoch(model, data_loader, batch_nb, idx2word_fr, idx2word_en):
 def main(
     data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
     model: str = 'seq2seqgru',
-    epochs: int = 10,
+    epochs: int = 20,
     optimizer: str = 'adam',
-    lr: float = 1e-4,
+    lr: float = 1e-3,
     batch_size: int = 32,
     vocab_size: int = None,  # If None all tokens of will be in vocab
     seq_len: int = None,  # If None the seq len is dynamic (might not work with all models)
-    seed: bool = True):
+    seed: bool = True,
+    model_config: dict = None,
+    embedding: str = None):
 
     # Call to remove tensorflow warning about casting float64 to float32
     tf.keras.backend.set_floatx('float32')
@@ -104,14 +107,17 @@ def main(
     if optimizer == 'adam':
         optimizer = tf.keras.optimizers.Adam(lr)
     elif optimizer == 'sgd':
-        optimizer = tf.keras.optimizers.SGD(lr) 
+        optimizer = tf.keras.optimizers.SGD(lr)
     else:
         raise Exception(f'Optimizer "{optimizer}" not recognized.')
 
-    # Create vocabs
-    logger.info('Creating vocab...')
+    # Data paths
     path_en = os.path.join(data_dir, 'train.lang1')
     path_fr = os.path.join(data_dir, 'train.lang2')
+    path_unaligned_en = os.path.join(data_dir, 'unaligned.en')
+
+    # Create vocabs
+    logger.info('Creating vocab...')
     word2idx_en, idx2word_en = utils.create_vocab(path_en, vocab_size)
     word2idx_fr, idx2word_fr = utils.create_vocab(path_fr, vocab_size)
     logger.info(f'Size of english vocab : {len(word2idx_en)}, size of french vocab : {len(word2idx_fr)}')
@@ -121,22 +127,46 @@ def main(
     train_dataset, valid_dataset, nb_train_ex, nb_valid_ex = utils.load_training_data(
         path_en, path_fr, word2idx_en, word2idx_fr, seq_len, batch_size)
     logger.info(f'Number of training examples : {nb_train_ex}, number of valid examples : {nb_valid_ex}')
+
+    # Load embeddings
+    if embedding:
+        logger.info(f'Loading embedding {embedding} ...')
+        if embedding == 'fasttext':
+            embedding = utils.create_fasttext_embedding_matrix(path_unaligned_en, word2idx_en)
+        elif embedding == 'word2vec':
+            raise Exception(f'Embedding "{embedding}" not implemented yet')
+        elif embedding == 'glove':
+            raise Exception(f'Embedding "{embedding}" not implemented yet')
+        else:
+            raise Exception(f'Embedding "{embedding}" not recognized.')
+
     # Create model
     if model == 'gru':
         model = baselines.GRU(len(word2idx_fr), batch_size)
     elif model == 'seq2seqgru':
-        model = Seq2SeqGRU(len(word2idx_en),
-                           word2idx_fr,
-                           batch_size,
-                           embedding_dim=256,
-                           encoder_units=512,
-                           decoder_units=512)
+        if model_config:
+            model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, model_config, embedding_matrix=embedding)
+        else:
+            model = Seq2SeqGRU(len(word2idx_en),
+                               word2idx_fr,
+                               batch_size, {
+                                   'embedding_dim': 256,
+                                   'encoder_units': 512,
+                                   'decoder_units': 512,
+                                   'n_layers': 1
+                               },
+                               embedding_matrix=embedding)
     elif model == 'transformer':
-        num_layers = 4
-        d_model = 128
-        dff = 512
-        num_heads = 8
-        model = transformer.Transformer(num_layers, d_model, num_heads, dff, len(word2idx_en), len(word2idx_fr), len(word2idx_en), len(word2idx_fr))   
+        if model_config:
+            pass
+        else:
+            num_layers = 4
+            d_model = 128
+            dff = 512
+            num_heads = 8
+            model = transformer.Transformer(num_layers, d_model, num_heads, dff, len(word2idx_en), len(word2idx_fr),
+                                            len(word2idx_en), len(word2idx_fr))
+
     else:
         raise Exception(f'Model "{model}" not recognized.')
 
@@ -179,7 +209,7 @@ def main(
         metrics['valid_bleu'].append(valid_bleu)
 
     # save metrics
-    utils.save_metrics(metrics, model_name)
+    utils.save_metrics(metrics, model.get_name())
     # Plot losses
     plots.plot_accuracy(metrics['train_accuracy'], metrics['valid_accuracy'])
 
