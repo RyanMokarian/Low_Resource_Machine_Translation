@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 from models import baselines
 from models.seq2seq_gru import Seq2SeqGRU
+from models.transformer import Transformer
 from utils import utils
 from utils import logging
 from utils import plots
@@ -46,7 +47,7 @@ def train_epoch(model, data_loader, optimizer, batch_nb, idx2word_fr):
         batch['gen_seq_len'] = labels.shape[1]
         with tf.GradientTape() as tape:
             preds = model(batch, training=True)
-            labels, preds = labels[:, 1:], preds[:, 1:]  # Ignore BOS token
+            labels = labels[:, 1:]  # Ignore BOS token (already not in preds)
             mask = tf.math.logical_not(tf.math.equal(labels, 0))
             loss = loss_function(y_true=labels, y_pred=preds, mask=mask)
 
@@ -67,7 +68,7 @@ def test_epoch(model, data_loader, batch_nb, idx2word_fr, idx2word_en):
         batch['gen_seq_len'] = labels.shape[1]
 
         preds = model(batch)
-        labels, preds = labels[:, 1:], preds[:, 1:]  # Ignore BOS token
+        labels = labels[:, 1:]  # Ignore BOS token (already not in preds)
         mask = tf.math.logical_not(tf.math.equal(labels, 0))
         loss = loss_function(y_true=labels, y_pred=preds, mask=mask)
 
@@ -84,7 +85,7 @@ def test_epoch(model, data_loader, batch_nb, idx2word_fr, idx2word_en):
 
 def main(
     data_dir: str = '/project/cq-training-1/project2/teams/team12/data/',
-    model: str = 'seq2seqgru',
+    model_name: str = 'seq2seqgru',
     epochs: int = 20,
     optimizer: str = 'adam',
     lr: float = 1e-3,
@@ -102,14 +103,6 @@ def main(
     if seed:
         tf.random.set_seed(SEED)
         np.random.seed(SEED)
-
-    # Optimizer
-    if optimizer == 'adam':
-        optimizer = tf.keras.optimizers.Adam(lr)
-    elif optimizer == 'sgd':
-        optimizer = tf.keras.optimizers.SGD(lr)
-    else:
-        raise Exception(f'Optimizer "{optimizer}" not recognized.')
 
     # Data paths
     path_en = os.path.join(data_dir, 'train.lang1')
@@ -141,34 +134,33 @@ def main(
             raise Exception(f'Embedding "{embedding}" not recognized.')
 
     # Create model
-    if model == 'gru':
+    if model_name == 'gru':
         model = baselines.GRU(len(word2idx_fr), batch_size)
-    elif model == 'seq2seqgru':
-        if model_config:
-            model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, model_config, embedding_matrix=embedding)
-        else:
-            model = Seq2SeqGRU(len(word2idx_en),
-                               word2idx_fr,
-                               batch_size, {
-                                   'embedding_dim': 256,
-                                   'encoder_units': 512,
-                                   'decoder_units': 512,
-                                   'n_layers': 1
-                               },
-                               embedding_matrix=embedding)
-    elif model == 'transformer':
-        if model_config:
-            pass
-        else:
-            num_layers = 4
-            d_model = 128
-            dff = 512
-            num_heads = 8
-            model = transformer.Transformer(num_layers, d_model, num_heads, dff, len(word2idx_en), len(word2idx_fr),
-                                            len(word2idx_en), len(word2idx_fr))
-
+    elif model_name == 'seq2seqgru':
+        if model_config is None:
+            model_config = {'embedding_dim': 256, 'encoder_units': 512, 'decoder_units': 512, 'n_layers': 1}
+        model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, model_config, embedding_matrix=embedding)
+    elif model_name == 'transformer':
+        if model_config is None:
+            model_config = {'num_layers': 4, 'd_model': 128, 'dff': 512, 'num_heads': 8}
+        model = Transformer(model_config, len(word2idx_en), len(word2idx_fr), len(word2idx_en), len(word2idx_fr))
     else:
         raise Exception(f'Model "{model}" not recognized.')
+
+    # Optimizer
+    if optimizer == 'adam':
+        if model_name == 'transformer':  # Use adam according to transformer paper
+            optimizer = tf.keras.optimizers.Adam(utils.CustomSchedule(model_config['d_model']),
+                                                 beta_1=0.9,
+                                                 beta_2=0.98,
+                                                 epsilon=1e-9)
+            logger.info('Using custom scheduler for learning rate, --lr argument ignored.')
+        else:
+            optimizer = tf.keras.optimizers.Adam(lr)
+    elif optimizer == 'sgd':
+        optimizer = tf.keras.optimizers.SGD(lr)
+    else:
+        raise Exception(f'Optimizer "{optimizer}" not recognized.')
 
     # Training loop
     logger.info(f'Training with model {model.get_name()} ...')
