@@ -16,20 +16,46 @@ import tensorflow as tf
 
 
 class Transformer(tf.keras.Model):
-    def __init__(self, config, input_vocab_size, target_vocab_size, pe_input, pe_target, rate=0.1):
+    def __init__(self, config, input_vocab_size, target_vocab, rate=0.1):
         super(Transformer, self).__init__()
+        self.start_token = target_vocab['<start>']
         self.config = config
         self.encoder = Encoder(config['num_layers'], config['d_model'], config['num_heads'], config['dff'],
-                               input_vocab_size, pe_input, rate)
+                               input_vocab_size, input_vocab_size, rate)
         self.decoder = Decoder(config['num_layers'], config['d_model'], config['num_heads'], config['dff'],
-                               target_vocab_size, pe_target, rate)
-        self.final_layer = tf.keras.layers.Dense(target_vocab_size)
+                               len(target_vocab), len(target_vocab), rate)
+        self.final_layer = tf.keras.layers.Dense(len(target_vocab))
 
     def call(self, batch, training=False):
         inputs, targets = batch['inputs'], batch['labels']
+        if 'gen_seq_len' in batch.keys():
+            gen_seq_len = batch['gen_seq_len']
+        else:
+            gen_seq_len = inputs.shape[1]
+        batch_size = inputs.shape[0]
 
-        # Shift the targets to use teacher forcing
-        targets = targets[:, :-1]  # Remove EOS
+        if training:
+            # Shift the targets to use teacher forcing
+            targets = targets[:, :-1]  # Remove EOS
+            return self.forward(inputs, targets, training)
+
+        predicted_seq = []
+        decoder_inputs = tf.fill([batch_size, 1], self.start_token)
+        for i in range(1, gen_seq_len):
+            # Create encoder/decoder masks
+            preds = self.forward(inputs, decoder_inputs, training)
+
+            # Select the last word from the seq_len dimension
+            pred = preds[:, -1:, :]  # (batch_size, 1, vocab_size)
+            predicted_id = tf.cast(tf.argmax(pred, axis=-1), tf.int32)
+            predicted_seq.append(tf.squeeze(pred))
+
+            # Concatentate the predicted_id to the output which is given to the decoder as its input.
+            decoder_inputs = tf.concat([decoder_inputs, predicted_id], axis=-1)
+
+        return tf.stack(predicted_seq, axis=1)
+
+    def forward(self, inputs, targets, training):
 
         enc_padding_mask, combined_mask, dec_padding_mask = create_masks(inputs, targets)
 
