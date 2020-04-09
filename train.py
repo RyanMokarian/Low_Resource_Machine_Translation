@@ -70,6 +70,7 @@ def test_epoch(model, data_loader, batch_nb, idx2word_fr, idx2word_en):
         preds = model(batch)
         labels = labels[:, 1:]  # Ignore BOS token (already not in preds)
         mask = tf.math.logical_not(tf.math.equal(labels, 0))
+
         loss = loss_function(y_true=labels, y_pred=preds, mask=mask)
 
         valid_accuracy_metric.update_state(y_true=labels, y_pred=preds, sample_weight=mask)
@@ -94,7 +95,10 @@ def main(
     seq_len: int = None,  # If None the seq len is dynamic (might not work with all models)
     seed: bool = True,
     model_config: dict = None,
-    embedding: str = None):
+    embedding: str = None,
+    back_translation_model: str = 'saved_model/Transformer-num_layers_2-d_model_128-num_heads_8-dff_512_fr_to_en',
+    back_translation: bool = False,
+    fr_to_en: bool = False):
 
     # Call to remove tensorflow warning about casting float64 to float32
     tf.keras.backend.set_floatx('float32')
@@ -108,6 +112,11 @@ def main(
     path_en = os.path.join(data_dir, 'train.lang1')
     path_fr = os.path.join(data_dir, 'train.lang2')
     path_unaligned_en = os.path.join(data_dir, 'unaligned.en')
+    path_unaligned_fr = os.path.join(data_dir, 'unaligned.fr')
+    if fr_to_en:  # Switch paths
+        tmp = path_en
+        path_en = path_fr
+        path_fr = tmp
 
     # Create vocabs
     logger.info('Creating vocab...')
@@ -115,10 +124,46 @@ def main(
     word2idx_fr, idx2word_fr = utils.create_vocab(path_fr, vocab_size)
     logger.info(f'Size of english vocab : {len(word2idx_en)}, size of french vocab : {len(word2idx_fr)}')
 
+    # Back translation
+    prediction_file = None
+    if back_translation:
+        prediction_file = os.path.join(utils.SHARED_PATH, 'translated_unaligned.fr')
+        if os.path.exists(prediction_file):
+            logger.info(f'Using translation from {prediction_file} for back-translation.')
+        else:
+            logger.info(f'Translating {path_unaligned_fr} for back-translation...')
+            # Load data
+            data = utils.load_data(path_unaligned_fr, word2idx_fr)
+            dataset = tf.data.Dataset.from_generator(lambda: [ex for ex in data],
+                                                     tf.int64,
+                                                     output_shapes=tf.TensorShape([None])).padded_batch(
+                                                         128, padded_shapes=[None])
+            # Load model
+            # FIXME: Config needs to be dynamic depending of the back_translation_model, like extracting it from filename
+            model_config = {'num_layers': 2, 'd_model': 128, 'dff': 512, 'num_heads': 8}
+            model = Transformer(model_config, len(word2idx_fr), word2idx_en)
+
+            model.load_weights(os.path.join(back_translation_model, "model"))
+            # Write prediction to file
+            with open(prediction_file, 'w') as f:
+                print('opening file and writing predictions...')
+                for batch in tqdm(dataset, desc='Translating...', total=len(data) // 128 + 1):
+                    preds = model({'inputs': batch, 'labels': tf.zeros_like(batch)})
+                    for pred in preds:
+                        sentence = utils.generate_sentence(np.argmax(pred.numpy(), axis=1).astype('int'), idx2word_en)
+                        f.writelines([sentence, '\n'])
+
     # Load datasets
     logger.info('Loading datasets...')
     train_dataset, valid_dataset, nb_train_ex, nb_valid_ex = utils.load_training_data(
-        path_en, path_fr, word2idx_en, word2idx_fr, seq_len, batch_size)
+        path_en,
+        path_fr,
+        word2idx_en,
+        word2idx_fr,
+        seq_len,
+        batch_size,
+        en_back_translated_path=prediction_file,
+        fr_unaligned_path=path_unaligned_fr)
     logger.info(f'Number of training examples : {nb_train_ex}, number of valid examples : {nb_valid_ex}')
 
     # Load embeddings
@@ -142,8 +187,8 @@ def main(
         model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, model_config, embedding_matrix=embedding)
     elif model_name == 'transformer':
         if model_config is None:
-            model_config = {'num_layers': 4, 'd_model': 128, 'dff': 512, 'num_heads': 8}
-        model = Transformer(model_config, len(word2idx_en), len(word2idx_fr), len(word2idx_en), len(word2idx_fr))
+            model_config = {'num_layers': 2, 'd_model': 128, 'dff': 512, 'num_heads': 8}
+        model = Transformer(model_config, len(word2idx_en), word2idx_fr)
     else:
         raise Exception(f'Model "{model}" not recognized.')
 

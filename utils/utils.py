@@ -108,17 +108,7 @@ def sort(x,y=None):
         return x[idx]
     return x[idx], y[idx]
 
-
-def load_training_data(en_path: str,
-                       fr_path: str, 
-                       vocab_en: typing.Dict[str, np.ndarray], 
-                       vocab_fr: typing.Dict[str, np.ndarray],
-                       seq_len: int,
-                       batch_size: int,
-                       valid_ratio: float = 0.15,
-                      ) -> typing.Tuple[tf.data.Dataset, tf.data.Dataset]:
-    """Returns train and valid datasets"""
-    
+def load_data(path: str, vocab: typing.Dict[str, np.ndarray], seq_len: int = None) -> np.ndarray:
     def sentence_to_vocab(sentences, vocab):
         data = []
         for i in range(len(sentences)):
@@ -132,18 +122,48 @@ def load_training_data(en_path: str,
                     sentence.append(vocab[UNKNOWN_TOKEN])
             data.append(np.array(sentence))
         return np.array(data)
-    # Get sentences
-    sentences_en = get_sentences(en_path)
-    sentences_fr = get_sentences(fr_path)
+
+    sentences = get_sentences(path)
+    data = sentence_to_vocab(sentences, vocab)
+    
+    return data
+
+
+def load_training_data(en_path: str,
+                       fr_path: str, 
+                       vocab_en: typing.Dict[str, np.ndarray], 
+                       vocab_fr: typing.Dict[str, np.ndarray],
+                       seq_len: int,
+                       batch_size: int,
+                       valid_ratio: float = 0.15,
+                       fr_unaligned_path: str = None,
+                       en_back_translated_path: str = None, 
+                       nb_back_translated_examples: int = 10000
+                      ) -> typing.Tuple[tf.data.Dataset, tf.data.Dataset]:
+    """Returns train and valid datasets"""
     
     # Build training data
-    train_X = sentence_to_vocab(sentences_en, vocab_en)
-    train_y = sentence_to_vocab(sentences_fr, vocab_fr)
+    train_X = load_data(en_path, vocab_en, seq_len)
+    train_y = load_data(fr_path, vocab_fr, seq_len)
     
     # Split in train and valid
     cuttoff_idx = int(np.round(len(train_X)*(1-valid_ratio)))
     train_X, valid_X = train_X[:cuttoff_idx], train_X[cuttoff_idx:]
     train_y, valid_y = train_y[:cuttoff_idx], train_y[cuttoff_idx:]
+
+    print('shape train_X : ', train_X.shape)
+    print('shape train_y : ', train_y.shape)
+    
+    # Load back-translated data if available
+    if fr_unaligned_path is not None and en_back_translated_path is not None:
+        back_translated_X = load_data(en_back_translated_path, vocab_en, seq_len)[:nb_back_translated_examples]
+        unaligned_y = load_data(fr_unaligned_path, vocab_fr, seq_len)[:nb_back_translated_examples]
+        train_X = np.concatenate((train_X, back_translated_X), axis=0)
+        train_y = np.concatenate((train_y, unaligned_y), axis=0)
+    
+    print('shape train_X : ', train_X.shape)
+    print('shape train_y : ', train_y.shape)
+
     
     if not seq_len: 
         train_X, train_y = sort(train_X, train_y)
