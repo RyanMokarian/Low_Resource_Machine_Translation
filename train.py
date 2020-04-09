@@ -96,7 +96,7 @@ def main(
     seed: bool = True,
     model_config: dict = None,
     embedding: str = None,
-    back_translation_model: str = 'saved_model/Transformer-num_layers_2-d_model_128-num_heads_8-dff_512',
+    back_translation_model: str = 'saved_model/Transformer-num_layers_2-d_model_128-num_heads_8-dff_512_fr_to_en',
     back_translation: bool = False,
     fr_to_en: bool = False):
 

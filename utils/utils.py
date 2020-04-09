@@ -137,7 +137,8 @@ def load_training_data(en_path: str,
                        batch_size: int,
                        valid_ratio: float = 0.15,
                        fr_unaligned_path: str = None,
-                       en_back_translated_path: str = None
+                       en_back_translated_path: str = None, 
+                       nb_back_translated_examples: int = 10000
                       ) -> typing.Tuple[tf.data.Dataset, tf.data.Dataset]:
     """Returns train and valid datasets"""
     
@@ -155,8 +156,8 @@ def load_training_data(en_path: str,
     
     # Load back-translated data if available
     if fr_unaligned_path is not None and en_back_translated_path is not None:
-        back_translated_X = load_data(en_back_translated_path, vocab_en, seq_len)
-        unaligned_y = load_data(fr_unaligned_path, vocab_fr, seq_len)
+        back_translated_X = load_data(en_back_translated_path, vocab_en, seq_len)[:nb_back_translated_examples]
+        unaligned_y = load_data(fr_unaligned_path, vocab_fr, seq_len)[:nb_back_translated_examples]
         train_X = np.concatenate((train_X, back_translated_X), axis=0)
         train_y = np.concatenate((train_y, unaligned_y), axis=0)
     
