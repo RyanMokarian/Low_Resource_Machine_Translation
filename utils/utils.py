@@ -36,17 +36,17 @@ def save_metrics(metrics, name):
     path = os.path.join(SAVED_MODEL_DIR, name)
     pickle.dump(metrics, open(os.path.join(path, 'metrics.pkl'), 'wb'))
 
-def create_fasttext_embedding_matrix(file_path: str, vocab: typing.Dict[str, int]) -> typing.Dict[str, np.ndarray]:
+def create_fasttext_embedding_matrix(file_path: str, vocab: typing.Dict[str, int], embedding_dim: int) -> typing.Dict[str, np.ndarray]:
     """Train a fasttext model and return the embeddings."""
     
-    model_path = os.path.join(SHARED_PATH, 'embedding_models', 'fasttext_model.bin')
+    model_path = os.path.join(SHARED_PATH, 'embedding_models', f'fasttext_model_dim_{embedding_dim}.bin')
     
     if os.path.exists(model_path):
         logger.info('Loading fasttext embeddings...')
         model = fasttext.load_model(model_path)
     else:
         logger.info('Training fasttext embeddings...')
-        model = fasttext.train_unsupervised(file_path, model='skipgram')
+        model = fasttext.train_unsupervised(file_path, model='skipgram', dim=embedding_dim)
         model.save_model(model_path)
 
     embedding_matrix = np.zeros((len(vocab), model.get_dimension()))
