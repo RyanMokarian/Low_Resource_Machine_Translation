@@ -24,7 +24,7 @@ def create_folder(path: str):
     if not os.path.exists(path):
         os.mkdir(path)
 
-def save_model(model: tf.keras.Model, name = None):
+def save_model(model: tf.keras.Model, name: str = None):
     """ This function saves the model to disk."""
     create_folder(SAVED_MODEL_DIR)
     if name: 
@@ -203,7 +203,7 @@ def load_training_data(en_path: str,
 
     return train_dataset, valid_dataset, len(train_y), len(valid_y)
 
-def generate_sentence(indices: typing.List[int], vocab: typing.Dict[int, str]):
+def generate_sentence(indices: typing.List[int], vocab: typing.Dict[int, str], ignore_unknown: bool = True) -> str:
     """Generate a sentence from a list of indices."""
     sentence = ''
     for idx in indices:
@@ -222,6 +222,30 @@ def generate_sentence(indices: typing.List[int], vocab: typing.Dict[int, str]):
     sentence = text_preprocessing.recapitalize(sentence)
 
     return sentence
+
+def generate_sentence_from_probabilities(probs: typing.List[np.ndarray], vocab: typing.Dict[int, str], ignore_unknown: bool = True) -> str:
+    """Generate a sentence from a list of probability vector."""
+    indices = np.argmax(probs, axis=1).astype('int')
+    sentence = ''
+    for i, idx in enumerate(indices):
+        if int(idx) not in vocab:
+            print(f'idx {idx} not in vocab')
+            continue
+        if vocab[idx] == UNKNOWN_TOKEN and ignore_unknown:
+            idx = int(np.argsort(probs[i])[-2]) # Take the second biggest prob
+        if vocab[idx] == PADDING_TOKEN \
+            or vocab[idx] == text_preprocessing.BOS:
+            continue
+        elif vocab[idx] == text_preprocessing.EOS:
+            break
+
+        sentence += vocab[int(idx)]
+        sentence += ' '
+    
+    sentence = text_preprocessing.recapitalize(sentence)
+
+    return sentence
+
 
 # Code from : https://www.tensorflow.org/tutorials/text/transformer
 class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):

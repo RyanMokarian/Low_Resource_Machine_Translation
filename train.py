@@ -79,7 +79,7 @@ def test_epoch(model, data_loader, batch_nb, idx2word_fr, idx2word_en):
 
     idx = 0
     label_sentence = utils.generate_sentence(labels[idx].numpy(), idx2word_fr)
-    pred_sentence = utils.generate_sentence(np.argmax(preds[idx].numpy(), axis=1).astype('int'), idx2word_fr)
+    pred_sentence = utils.generate_sentence_from_probabilities(preds[idx].numpy(), idx2word_fr)
     source_sentence = utils.generate_sentence(batch['inputs'][idx].numpy().astype('int'), idx2word_en)
     logger.debug(f'Sample : \n    Source : {source_sentence}\n    Pred : {pred_sentence}\n    Label : {label_sentence}')
 
@@ -97,7 +97,8 @@ def main(
     model_config: dict = None,
     embedding: str = None,
     embedding_dim: int = 128,
-    back_translation_model: str = 'saved_model/Transformer-num_layers_2-d_model_128-num_heads_8-dff_512_fr_to_en',
+    back_translation_model:
+    str = 'saved_model/Transformer-num_layers_2-d_model_128-num_heads_8-dff_512_fr_to_en_True_embedding_None_embedding_dim_128_back_translation_False',
     back_translation: bool = False,
     back_translation_ratio: float = 1.0,
     fr_to_en: bool = False):
@@ -221,6 +222,8 @@ def main(
         'train_bleu': [],
         'valid_bleu': []
     }
+    model_path = model.get_name() + f'_fr_to_en_{fr_to_en}_embedding_{embedding}_embedding_dim_{embedding_dim}'\
+                                    f'_back_translation_{back_translation}'
     best_valid_bleu = 0
     for epoch in range(epochs):
         train_epoch(model, train_dataset, optimizer, np.ceil(nb_train_ex / batch_size), idx2word_fr)
@@ -234,7 +237,7 @@ def main(
 
         if valid_bleu > best_valid_bleu:
             best_valid_bleu = valid_bleu
-            utils.save_model(model)
+            utils.save_model(model, model_path)
 
         # Logs
         logger.info(f'Epoch {epoch}\n'\
@@ -262,7 +265,7 @@ def main(
                                                               back_translation_ratio=back_translation_ratio)
 
     # save metrics
-    utils.save_metrics(metrics, model.get_name())
+    utils.save_metrics(metrics, model_path)
     # Plot losses
     plots.plot_accuracy(metrics['train_accuracy'], metrics['valid_accuracy'])
 
