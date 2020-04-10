@@ -96,8 +96,10 @@ def main(
     seed: bool = True,
     model_config: dict = None,
     embedding: str = None,
+    embedding_dim: int = 128,
     back_translation_model: str = 'saved_model/Transformer-num_layers_2-d_model_128-num_heads_8-dff_512_fr_to_en',
     back_translation: bool = False,
+    back_translation_ratio: float = 1.0,
     fr_to_en: bool = False):
 
     # Call to remove tensorflow warning about casting float64 to float32
@@ -127,7 +129,7 @@ def main(
     # Back translation
     prediction_file = None
     if back_translation:
-        prediction_file = os.path.join(utils.SHARED_PATH, 'translated_unaligned.fr')
+        prediction_file = os.path.join(utils.SHARED_PATH, 'translated_unaligned.en')
         if os.path.exists(prediction_file):
             logger.info(f'Using translation from {prediction_file} for back-translation.')
         else:
@@ -142,8 +144,8 @@ def main(
             # FIXME: Config needs to be dynamic depending of the back_translation_model, like extracting it from filename
             model_config = {'num_layers': 2, 'd_model': 128, 'dff': 512, 'num_heads': 8}
             model = Transformer(model_config, len(word2idx_fr), word2idx_en)
-
             model.load_weights(os.path.join(back_translation_model, "model"))
+
             # Write prediction to file
             with open(prediction_file, 'w') as f:
                 print('opening file and writing predictions...')
@@ -163,14 +165,15 @@ def main(
         seq_len,
         batch_size,
         en_back_translated_path=prediction_file,
-        fr_unaligned_path=path_unaligned_fr)
+        fr_unaligned_path=path_unaligned_fr,
+        back_translation_ratio=back_translation_ratio)
     logger.info(f'Number of training examples : {nb_train_ex}, number of valid examples : {nb_valid_ex}')
 
     # Load embeddings
     if embedding:
         logger.info(f'Loading embedding {embedding} ...')
         if embedding == 'fasttext':
-            embedding = utils.create_fasttext_embedding_matrix(path_unaligned_en, word2idx_en)
+            embedding = utils.create_fasttext_embedding_matrix(path_unaligned_en, word2idx_en, embedding_dim)
         elif embedding == 'word2vec':
             raise Exception(f'Embedding "{embedding}" not implemented yet')
         elif embedding == 'glove':
@@ -188,7 +191,7 @@ def main(
     elif model_name == 'transformer':
         if model_config is None:
             model_config = {'num_layers': 2, 'd_model': 128, 'dff': 512, 'num_heads': 8}
-        model = Transformer(model_config, len(word2idx_en), word2idx_fr)
+        model = Transformer(model_config, len(word2idx_en), word2idx_fr, embedding_matrix=embedding)
     else:
         raise Exception(f'Model "{model}" not recognized.')
 
@@ -234,9 +237,10 @@ def main(
             utils.save_model(model)
 
         # Logs
-        logger.info(
-            f'Epoch {epoch}\n    Train BLEU : {train_bleu:.4f} - Valid BLEU : {valid_bleu:.4f}\n    Train Accuracy : {train_accuracy:.4f} - Valid Accuracy : {valid_accuracy:.4f}\n    Train Loss : {train_loss:.4f} - Valid Loss : {valid_loss:.4f}'
-        )
+        logger.info(f'Epoch {epoch}\n'\
+                    f'    Train BLEU : {train_bleu:.4f} - Valid BLEU : {valid_bleu:.4f}\n'\
+                    f'    Train Accuracy : {train_accuracy:.4f} - Valid Accuracy : {valid_accuracy:.4f}\n'\
+                    f'    Train Loss : {train_loss:.4f} - Valid Loss : {valid_loss:.4f}')
 
         metrics['train_accuracy'].append(train_accuracy)
         metrics['valid_accuracy'].append(valid_accuracy)
@@ -244,6 +248,18 @@ def main(
         metrics['valid_loss'].append(valid_loss)
         metrics['train_bleu'].append(train_bleu)
         metrics['valid_bleu'].append(valid_bleu)
+
+        # If using back translation, sample new generated examples for next epoch
+        if back_translation:
+            train_dataset, _, _, _ = utils.load_training_data(path_en,
+                                                              path_fr,
+                                                              word2idx_en,
+                                                              word2idx_fr,
+                                                              seq_len,
+                                                              batch_size,
+                                                              en_back_translated_path=prediction_file,
+                                                              fr_unaligned_path=path_unaligned_fr,
+                                                              back_translation_ratio=back_translation_ratio)
 
     # save metrics
     utils.save_metrics(metrics, model.get_name())

@@ -5,23 +5,21 @@
 import numpy as np
 import tensorflow as tf
 
-# num_layers = 4
-# d_model = 128
-# dff = 512
-# num_heads = 8
-
-# input_vocab_size = tokenizer_pt.vocab_size + 2
-# target_vocab_size = tokenizer_en.vocab_size + 2
-# dropout_rate = 0.1
-
 
 class Transformer(tf.keras.Model):
-    def __init__(self, config, input_vocab_size, target_vocab, rate=0.1):
+    def __init__(self, config, input_vocab_size, target_vocab, embedding_matrix=None, rate=0.1):
         super(Transformer, self).__init__()
         self.start_token = target_vocab['<start>']
         self.config = config
-        self.encoder = Encoder(config['num_layers'], config['d_model'], config['num_heads'], config['dff'],
-                               input_vocab_size, input_vocab_size, rate)
+
+        # FIXME : We should probably create the embedding matrix depending of the config so we don't have to do this
+        if embedding_matrix is not None:
+            embedding_size = embedding_matrix.shape[1]
+        else:
+            embedding_size = config['d_model']
+
+        self.encoder = Encoder(config['num_layers'], embedding_size, config['num_heads'], config['dff'],
+                               input_vocab_size, input_vocab_size, embedding_matrix, rate)
         self.decoder = Decoder(config['num_layers'], config['d_model'], config['num_heads'], config['dff'],
                                len(target_vocab), len(target_vocab), rate)
         self.final_layer = tf.keras.layers.Dense(len(target_vocab))
@@ -283,13 +281,28 @@ class DecoderLayer(tf.keras.layers.Layer):
 
 
 class Encoder(tf.keras.layers.Layer):
-    def __init__(self, num_layers, d_model, num_heads, dff, input_vocab_size, maximum_position_encoding, rate=0.1):
+    def __init__(self,
+                 num_layers,
+                 d_model,
+                 num_heads,
+                 dff,
+                 input_vocab_size,
+                 maximum_position_encoding,
+                 embedding_matrix,
+                 rate=0.1):
         super(Encoder, self).__init__()
 
         self.d_model = d_model
         self.num_layers = num_layers
 
-        self.embedding = tf.keras.layers.Embedding(input_vocab_size, d_model)
+        if embedding_matrix is not None:
+            self.embedding = tf.keras.layers.Embedding(input_vocab_size,
+                                                       d_model,
+                                                       weights=[embedding_matrix],
+                                                       trainable=False)
+        else:
+            self.embedding = tf.keras.layers.Embedding(input_vocab_size, d_model)
+
         self.pos_encoding = positional_encoding(maximum_position_encoding, self.d_model)
 
         self.enc_layers = [EncoderLayer(d_model, num_heads, dff, rate) for _ in range(num_layers)]

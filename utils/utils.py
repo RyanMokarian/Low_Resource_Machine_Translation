@@ -16,6 +16,9 @@ UNKNOWN_TOKEN = '<unk>'
 SAVED_MODEL_DIR = 'saved_model'
 SHARED_PATH = '/project/cq-training-1/project2/teams/team12/'
 
+aligned_data = None
+back_translated_data = None
+
 def create_folder(path: str):
     """ This function creates a folder if it does not already exists."""
     if not os.path.exists(path):
@@ -36,17 +39,17 @@ def save_metrics(metrics, name):
     path = os.path.join(SAVED_MODEL_DIR, name)
     pickle.dump(metrics, open(os.path.join(path, 'metrics.pkl'), 'wb'))
 
-def create_fasttext_embedding_matrix(file_path: str, vocab: typing.Dict[str, int]) -> typing.Dict[str, np.ndarray]:
+def create_fasttext_embedding_matrix(file_path: str, vocab: typing.Dict[str, int], embedding_dim: int) -> typing.Dict[str, np.ndarray]:
     """Train a fasttext model and return the embeddings."""
     
-    model_path = os.path.join(SHARED_PATH, 'embedding_models', 'fasttext_model.bin')
+    model_path = os.path.join(SHARED_PATH, 'embedding_models', f'fasttext_model_dim_{embedding_dim}.bin')
     
     if os.path.exists(model_path):
         logger.info('Loading fasttext embeddings...')
         model = fasttext.load_model(model_path)
     else:
         logger.info('Training fasttext embeddings...')
-        model = fasttext.train_unsupervised(file_path, model='skipgram')
+        model = fasttext.train_unsupervised(file_path, model='skipgram', dim=embedding_dim)
         model.save_model(model_path)
 
     embedding_matrix = np.zeros((len(vocab), model.get_dimension()))
@@ -138,31 +141,52 @@ def load_training_data(en_path: str,
                        valid_ratio: float = 0.15,
                        fr_unaligned_path: str = None,
                        en_back_translated_path: str = None, 
-                       nb_back_translated_examples: int = 10000
+                       back_translation_ratio: float = 1.0
                       ) -> typing.Tuple[tf.data.Dataset, tf.data.Dataset]:
     """Returns train and valid datasets"""
+
+    # Global variables that hold the data to avoid reloading it multiple times when doing back-translation
+    # (We load a new training set each epoch when doing back-translation)
+    global aligned_data
+    global back_translated_data
     
     # Build training data
-    train_X = load_data(en_path, vocab_en, seq_len)
-    train_y = load_data(fr_path, vocab_fr, seq_len)
+    if aligned_data is None:
+        train_X = load_data(en_path, vocab_en, seq_len)
+        train_y = load_data(fr_path, vocab_fr, seq_len)
+        aligned_data = (train_X, train_y)
+    else:
+        train_X, train_y = aligned_data
     
     # Split in train and valid
     cuttoff_idx = int(np.round(len(train_X)*(1-valid_ratio)))
     train_X, valid_X = train_X[:cuttoff_idx], train_X[cuttoff_idx:]
     train_y, valid_y = train_y[:cuttoff_idx], train_y[cuttoff_idx:]
 
-    print('shape train_X : ', train_X.shape)
-    print('shape train_y : ', train_y.shape)
+    logger.debug(f'shape train_X : {train_X.shape}')
+    logger.debug(f'shape train_y : {train_y.shape}')
     
     # Load back-translated data if available
     if fr_unaligned_path is not None and en_back_translated_path is not None:
-        back_translated_X = load_data(en_back_translated_path, vocab_en, seq_len)[:nb_back_translated_examples]
-        unaligned_y = load_data(fr_unaligned_path, vocab_fr, seq_len)[:nb_back_translated_examples]
+        
+        if back_translated_data is None:
+            back_translated_X = load_data(en_back_translated_path, vocab_en, seq_len)
+            unaligned_y = load_data(fr_unaligned_path, vocab_fr, seq_len)
+            back_translated_data = (back_translated_X, unaligned_y)
+        else:
+            back_translated_X, unaligned_y = back_translated_data
+
+        # Sample data according to back translation ratio
+        nb_examples = int(len(train_X) * back_translation_ratio)
+        sample = np.random.randint(0, len(back_translated_X), nb_examples)
+        back_translated_X = back_translated_X[sample]
+        unaligned_y = unaligned_y[sample]
+
         train_X = np.concatenate((train_X, back_translated_X), axis=0)
         train_y = np.concatenate((train_y, unaligned_y), axis=0)
     
-    print('shape train_X : ', train_X.shape)
-    print('shape train_y : ', train_y.shape)
+    logger.debug(f'shape train_X : {train_X.shape}')
+    logger.debug(f'shape train_y : {train_y.shape}')
 
     
     if not seq_len: 
