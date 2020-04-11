@@ -15,6 +15,7 @@ PADDING_TOKEN = '<pad>'
 UNKNOWN_TOKEN = '<unk>'
 SAVED_MODEL_DIR = 'saved_model'
 SHARED_PATH = '/project/cq-training-1/project2/teams/team12/'
+MAX_SEQ_LEN = 134
 
 aligned_data = None
 back_translated_data = None
@@ -100,8 +101,11 @@ def get_sentences(file_path: str) -> typing.List[typing.List[str]]:
     sentences = []
     for line in lines:
         line = text_preprocessing.process(line)
-        sentences.append(line.split())
-        
+        sentence = line.split()
+        if len(sentence) > MAX_SEQ_LEN:
+            sentence = sentence[:MAX_SEQ_LEN]
+        sentences.append(sentence)
+
     return sentences
 
 def sort(x,y=None):

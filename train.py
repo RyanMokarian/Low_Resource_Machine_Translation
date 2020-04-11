@@ -114,8 +114,8 @@ def main(
     # Data paths
     path_en = os.path.join(data_dir, 'train.lang1')
     path_fr = os.path.join(data_dir, 'train.lang2')
-    path_unaligned_en = os.path.join(data_dir, 'unaligned.en')
-    path_unaligned_fr = os.path.join(data_dir, 'unaligned.fr')
+    path_unaligned_en = os.path.join(data_dir, 'unaligned-tok.en')
+    path_unaligned_fr = os.path.join(data_dir, 'unaligned-tok.fr')
     if fr_to_en:  # Switch paths
         tmp = path_en
         path_en = path_fr
@@ -223,7 +223,7 @@ def main(
         'valid_bleu': []
     }
     model_path = model.get_name() + f'_fr_to_en_{fr_to_en}_embedding_{embedding}_embedding_dim_{embedding_dim}'\
-                                    f'_back_translation_{back_translation}'
+                                    f'_back_translation_{back_translation}_ratio_{back_translation_ratio}'
     best_valid_bleu = 0
     for epoch in range(epochs):
         train_epoch(model, train_dataset, optimizer, np.ceil(nb_train_ex / batch_size), idx2word_fr)
