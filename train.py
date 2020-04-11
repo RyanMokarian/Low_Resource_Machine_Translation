@@ -174,7 +174,7 @@ def main(
     if embedding:
         logger.info(f'Loading embedding {embedding} ...')
         if embedding == 'fasttext':
-            embedding = utils.create_fasttext_embedding_matrix(path_unaligned_en, word2idx_en, embedding_dim)
+            embedding_matrix = utils.create_fasttext_embedding_matrix(path_unaligned_en, word2idx_en, embedding_dim)
         elif embedding == 'word2vec':
             raise Exception(f'Embedding "{embedding}" not implemented yet')
         elif embedding == 'glove':
@@ -188,11 +188,11 @@ def main(
     elif model_name == 'seq2seqgru':
         if model_config is None:
             model_config = {'embedding_dim': 256, 'encoder_units': 512, 'decoder_units': 512, 'n_layers': 1}
-        model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, model_config, embedding_matrix=embedding)
+        model = Seq2SeqGRU(len(word2idx_en), word2idx_fr, batch_size, model_config, embedding_matrix=embedding_matrix)
     elif model_name == 'transformer':
         if model_config is None:
             model_config = {'num_layers': 2, 'd_model': 128, 'dff': 512, 'num_heads': 8}
-        model = Transformer(model_config, len(word2idx_en), word2idx_fr, embedding_matrix=embedding)
+        model = Transformer(model_config, len(word2idx_en), word2idx_fr, embedding_matrix=embedding_matrix)
     else:
         raise Exception(f'Model "{model}" not recognized.')
 
