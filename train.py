@@ -264,6 +264,10 @@ def main(
                                                               fr_unaligned_path=path_unaligned_fr,
                                                               back_translation_ratio=back_translation_ratio)
 
+        # If training with embeddings, unfreeze embedding layer at 50th epoch
+        if epoch == 48 and embedding and model_name == 'transformer':
+            model.unfreeze_embedding_layer()
+
     # save metrics
     utils.save_metrics(metrics, model_path)
     # Plot losses
