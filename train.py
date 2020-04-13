@@ -171,6 +171,7 @@ def main(
     logger.info(f'Number of training examples : {nb_train_ex}, number of valid examples : {nb_valid_ex}')
 
     # Load embeddings
+    embedding_matrix = None
     if embedding:
         logger.info(f'Loading embedding {embedding} ...')
         if embedding == 'fasttext':
