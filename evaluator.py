@@ -1,4 +1,6 @@
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import argparse
 import subprocess
 import tempfile
@@ -8,7 +10,11 @@ import numpy as np
 import tensorflow as tf
 
 from models.transformer import Transformer
+from utils import logging
 from utils import utils
+
+logging.initializeLogger()
+logger = logging.getLogger()
 
 
 def generate_predictions(input_file_path: str, pred_file_path: str):
@@ -29,16 +35,17 @@ def generate_predictions(input_file_path: str, pred_file_path: str):
 
     ##### MODIFY BELOW #####
     data_dir = '/project/cq-training-1/project2/teams/team12/data/'
-    best_model_path = '../saved_model/back-translation/Transformer-num_layers_2-d_model_128-num_heads_8-dff_512_fr_to_en_False_embedding_None_embedding_dim_128_back_translation_True_ratio_4.0'
+    best_model_path = 'saved_model/Transformer-num_layers_2-d_model_128-num_heads_8-dff_512_fr_to_en_False_embedding_None_embedding_dim_128_back_translation_True_ratio_4.0'
     path_en = os.path.join(data_dir, 'train.lang1')
     path_fr = os.path.join(data_dir, 'train.lang2')
     
     # Create vocabs
-    print('Creating vocab...')
+    logger.info('Creating vocab...')
     word2idx_en, idx2word_en = utils.create_vocab(path_en, vocab_size=None)
     word2idx_fr, idx2word_fr = utils.create_vocab(path_fr, vocab_size=None)
 
     # Load data
+    logger.info('Loading data...')
     data = utils.load_data(input_file_path, word2idx_en)
     dataset = tf.data.Dataset.from_generator(lambda: [ex for ex in data],
                                                 tf.int64,
@@ -51,7 +58,7 @@ def generate_predictions(input_file_path: str, pred_file_path: str):
 
     # Write prediction to file
     with open(pred_file_path, 'w') as f:
-        print('opening file and writing predictions...')
+        logger.info('Opening file and writing predictions...')
         for batch in tqdm(dataset, desc='Translating...', total=len(data) // 128 + 1):
             preds = model({'inputs': batch, 'labels': tf.zeros_like(batch)})
             for pred in preds:
