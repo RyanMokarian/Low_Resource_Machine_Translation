@@ -1,6 +1,14 @@
+import os
 import argparse
 import subprocess
 import tempfile
+
+from tqdm import tqdm
+import numpy as np
+import tensorflow as tf
+
+from models.transformer import Transformer
+from utils import utils
 
 
 def generate_predictions(input_file_path: str, pred_file_path: str):
@@ -20,7 +28,35 @@ def generate_predictions(input_file_path: str, pred_file_path: str):
     """
 
     ##### MODIFY BELOW #####
-    ...
+    data_dir = '/project/cq-training-1/project2/teams/team12/data/'
+    best_model_path = '../saved_model/back-translation/Transformer-num_layers_2-d_model_128-num_heads_8-dff_512_fr_to_en_False_embedding_None_embedding_dim_128_back_translation_True_ratio_4.0'
+    path_en = os.path.join(data_dir, 'train.lang1')
+    path_fr = os.path.join(data_dir, 'train.lang2')
+    
+    # Create vocabs
+    print('Creating vocab...')
+    word2idx_en, idx2word_en = utils.create_vocab(path_en, vocab_size=None)
+    word2idx_fr, idx2word_fr = utils.create_vocab(path_fr, vocab_size=None)
+
+    # Load data
+    data = utils.load_data(input_file_path, word2idx_en)
+    dataset = tf.data.Dataset.from_generator(lambda: [ex for ex in data],
+                                                tf.int64,
+                                                output_shapes=tf.TensorShape([None])).padded_batch(
+                                                    128, padded_shapes=[None])
+    # Load model
+    model_config = {'num_layers': 2, 'd_model': 128, 'dff': 512, 'num_heads': 8}
+    model = Transformer(model_config, len(word2idx_en), word2idx_fr)
+    model.load_weights(os.path.join(best_model_path, "model"))
+
+    # Write prediction to file
+    with open(pred_file_path, 'w') as f:
+        print('opening file and writing predictions...')
+        for batch in tqdm(dataset, desc='Translating...', total=len(data) // 128 + 1):
+            preds = model({'inputs': batch, 'labels': tf.zeros_like(batch)})
+            for pred in preds:
+                sentence = utils.generate_sentence_from_probabilities(pred.numpy(), idx2word_fr)
+                f.writelines([sentence, '\n'])
     ##### MODIFY ABOVE #####
 
 
