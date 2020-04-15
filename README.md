@@ -5,7 +5,7 @@ Project 2 of the course IFT6759
 Install the virtual environnement and call the evaluator.py script with the proper input file and target file.
 ```
 # create and source a clean virtual env
-pip install -e requirements.txt
+pip install -r requirements.txt
 
 # run the evaluator
 python evaluator.py --input-file-path /project/cq-training-1/project2/data/train.lang1
