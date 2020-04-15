@@ -15,7 +15,7 @@ class BleuScore():
     def update_state(self, y_true, y_pred, vocab):
         for i in range(len(y_true)):
             label_sentence = utils.generate_sentence(y_true[i].numpy().astype('int'), vocab)
-            pred_sentence = utils.generate_sentence(np.argmax(y_pred[i].numpy(), axis=1).astype('int'), vocab)
+            pred_sentence = utils.generate_sentence_from_probabilities(y_pred[i].numpy(), vocab)
             self.total_score += sacrebleu.sentence_bleu(pred_sentence, label_sentence, smooth_method='exp').score
             self.total_num_examples += 1
 

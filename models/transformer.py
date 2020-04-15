@@ -74,6 +74,9 @@ class Transformer(tf.keras.Model):
         name += f'-dff_{self.config["dff"]}'
         return name
 
+    def unfreeze_embedding_layer(self):
+        self.encoder.unfreeze_embedding_layer()
+
 
 def scaled_dot_product_attention(q, k, v, mask):
     """Calculate the attention weights.
@@ -294,6 +297,8 @@ class Encoder(tf.keras.layers.Layer):
 
         self.d_model = d_model
         self.num_layers = num_layers
+        self.input_vocab_size = input_vocab_size
+        self.embedding_matrix = embedding_matrix
 
         if embedding_matrix is not None:
             self.embedding = tf.keras.layers.Embedding(input_vocab_size,
@@ -324,6 +329,12 @@ class Encoder(tf.keras.layers.Layer):
             x = self.enc_layers[i](x, training, mask)
 
         return x  # (batch_size, input_seq_len, d_model)
+
+    def unfreeze_embedding_layer(self):
+        self.embedding = tf.keras.layers.Embedding(self.input_vocab_size,
+                                                    self.d_model,
+                                                    weights=[self.embedding_matrix],
+                                                    trainable=True)
 
 
 class Decoder(tf.keras.layers.Layer):
