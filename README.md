@@ -8,8 +8,7 @@ Install the virtual environnement and call the evaluator.py script with the prop
 pip install -r requirements.txt
 
 # run the evaluator
-python evaluator.py --input-file-path /project/cq-training-1/project2/data/train.lang1
-                    --target-file-path /project/cq-training-1/project2/data/train.lang2
+python evaluator.py --input-file-path /project/cq-training-1/project2/data/train.lang1 --target-file-path /project/cq-training-1/project2/data/train.lang2
 ```
 
 ## Train models
