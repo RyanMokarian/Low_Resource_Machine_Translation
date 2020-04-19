@@ -33,8 +33,7 @@ def loss_function(y_true, y_pred, mask):
     loss_ = cross_entropy(y_true, y_pred)
     mask = tf.cast(mask, dtype=loss_.dtype)
     loss_ *= mask
-    loss_ = tf.reduce_mean(
-        loss_)  #tf.reduce_sum(loss_) / tf.reduce_sum(mask)  # prevent taking average over padding positions as well
+    loss_ = tf.reduce_sum(loss_) / tf.reduce_sum(mask)  # prevent taking average over padding positions as well
     return loss_
 
 
@@ -97,8 +96,7 @@ def main(
     model_config: dict = None,
     embedding: str = None,
     embedding_dim: int = 128,
-    back_translation_model:
-    str = 'saved_model/Transformer-num_layers_2-d_model_128-num_heads_8-dff_512_fr_to_en_True_embedding_None_embedding_dim_128_back_translation_False',
+    back_translation_model: str = 'saved_model/<model_folder_name>',
     back_translation: bool = False,
     back_translation_ratio: float = 1.0,
     fr_to_en: bool = False):
@@ -142,7 +140,6 @@ def main(
                                                      output_shapes=tf.TensorShape([None])).padded_batch(
                                                          128, padded_shapes=[None])
             # Load model
-            # FIXME: Config needs to be dynamic depending of the back_translation_model, like extracting it from filename
             model_config = {'num_layers': 2, 'd_model': 128, 'dff': 512, 'num_heads': 8}
             model = Transformer(model_config, len(word2idx_fr), word2idx_en)
             model.load_weights(os.path.join(back_translation_model, "model"))
@@ -271,7 +268,8 @@ def main(
 
     # save metrics
     utils.save_metrics(metrics, model_path)
-    # Plot losses
+
+    # Plot accuracy
     plots.plot_accuracy(metrics['train_accuracy'], metrics['valid_accuracy'])
 
 

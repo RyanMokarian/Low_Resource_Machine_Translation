@@ -12,7 +12,6 @@ class Transformer(tf.keras.Model):
         self.start_token = target_vocab['<start>']
         self.config = config
 
-        # FIXME : We should probably create the embedding matrix depending of the config so we don't have to do this
         if embedding_matrix is not None:
             embedding_size = embedding_matrix.shape[1]
         else:
@@ -332,9 +331,9 @@ class Encoder(tf.keras.layers.Layer):
 
     def unfreeze_embedding_layer(self):
         self.embedding = tf.keras.layers.Embedding(self.input_vocab_size,
-                                                    self.d_model,
-                                                    weights=[self.embedding_matrix],
-                                                    trainable=True)
+                                                   self.d_model,
+                                                   weights=[self.embedding_matrix],
+                                                   trainable=True)
 
 
 class Decoder(tf.keras.layers.Layer):

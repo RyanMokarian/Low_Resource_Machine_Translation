@@ -12,16 +12,15 @@ logger = logging.getLogger(__name__)
 
 def main():
     parser = argparse.ArgumentParser('script for tokenizing data. It relies on the spacy tokenizer')
-    parser.add_argument('--input', nargs='+', help='input file. Note it can be more than one',
-                        required=True)
-    parser.add_argument('--output', help='path to outputs - will store files here',
-                        required=True)
+    parser.add_argument('--input', nargs='+', help='input file. Note it can be more than one', required=True)
+    parser.add_argument('--output', help='path to outputs - will store files here', required=True)
     parser.add_argument('--lang', help='either en or fr', required=True)
     parser.add_argument('--keep-case', help='will not lowercase', action='store_true')
     parser.add_argument('--keep-empty-lines', help='will keep empty lines', action='store_true')
-    parser.add_argument('--newline-to-space', help='converts newlines to spaces',
-                        action='store_true')
-    parser.add_argument('--skip-lines-with-pattern', nargs='*', default=[],
+    parser.add_argument('--newline-to-space', help='converts newlines to spaces', action='store_true')
+    parser.add_argument('--skip-lines-with-pattern',
+                        nargs='*',
+                        default=[],
                         help='skip lines where any of these regex applies')
 
     args = parser.parse_args()
@@ -57,14 +56,13 @@ def main():
     done = 0
     for current_file in args.input:
         logger.info('tokenizing file {}'.format(current_file))
-        tot_lines, empty_skipped, regex_skipped= tokenize(
-            current_file, args.output, tokenizer, args.keep_case, args.keep_empty_lines,
-            args.newline_to_space, regs)
+        tot_lines, empty_skipped, regex_skipped = tokenize(current_file, args.output, tokenizer, args.keep_case,
+                                                           args.keep_empty_lines, args.newline_to_space, regs)
         done += 1
         logger.info('done ({} / {}) - skipped {} lines (over {} - i.e., {:3.2f}%) because empty,'
                     ' skipped {} lines (over {} - i.e., {:3.2f}%) because of regex'.format(
-            done, len(args.input), empty_skipped, tot_lines, (empty_skipped / tot_lines) * 100,
-            regex_skipped, tot_lines, (regex_skipped / tot_lines) * 100))
+                        done, len(args.input), empty_skipped, tot_lines, (empty_skipped / tot_lines) * 100,
+                        regex_skipped, tot_lines, (regex_skipped / tot_lines) * 100))
 
 
 def get_stream_size(stream):

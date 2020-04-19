@@ -11,11 +11,9 @@ PUNCTUATION = {",", ";", ":", "!", "?", ".", "'", '"', "(", ")", "...", "[", "]"
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        'script to remove punctuation. Data must be already tokenized.')
+    parser = argparse.ArgumentParser('script to remove punctuation. Data must be already tokenized.')
     parser.add_argument('--input', nargs='+', help='input file. Note it can be more than one')
-    parser.add_argument('--output', help='path to outputs - will store files here',
-                        required=True)
+    parser.add_argument('--output', help='path to outputs - will store files here', required=True)
 
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)

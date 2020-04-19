@@ -5,7 +5,4 @@
 module load python/3.7
 source ~/venv/bin/activate
 
-#cd project2/low-resource-translation
-#python runs.py --model_name=transformer
-
-python train.py --model_name=transformer --epochs=100 --batch_size=128 --back_translation=True
+python runs.py --model_name=transformer

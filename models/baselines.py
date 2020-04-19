@@ -79,5 +79,4 @@ class RecurrentNet(tf.keras.Model):
         return outputs, new_state
 
     def get_name(self):
-        # TODO : Add Model parameters to the name so that the model name is unique.
         return self.__class__.__name__
