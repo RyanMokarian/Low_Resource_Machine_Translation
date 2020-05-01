@@ -1,5 +1,12 @@
-# low-resource-translation
-Project 2 of the course IFT6759
+*****************************************************************************
+*	Title: "Low Resource Machine Translation"
+
+*	Category: Machine Learning
+
+*	Authors: Ryan Mokarian, Olivier Tessier-Lariviere, Azfar Khoja, Yichen Lin
+*****************************************************************************
+Description:
+Adequate parallel data for training a Neural Machine Translation system is not alwaysavailable. Inthiswork,weexplorestrategiestoincreasemachinetranslation performance in a low resource scenario through the use of generally more widely available monolingual data. We leverage target monolingual data using backtranslation and improve our baseline score by 3.5 BLEU. We ﬁnd that the use of pre-trained embeddings on the source monolingual data is ineffective. For details, refer to Low Resource Machine Translation.pdf.
 
 ## Running the evaluation script
 Install the virtual environnement and call the evaluator.py script with the proper input file and target file.
